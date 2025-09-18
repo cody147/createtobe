@@ -1,26 +1,185 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* 自定义样式 */
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply text-gray-900 bg-gray-50;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  /* 动画类 */
+  .animate-in {
+    animation: animate-in 0.3s ease-out;
+  }
+  
+  .slide-in-from-right-full {
+    animation: slide-in-from-right-full 0.3s ease-out;
+  }
+  
+  /* 滚动条样式 */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-gray-100 rounded-full;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full hover:bg-gray-400;
+  }
+  
+  /* 表格样式 */
+  .table-container {
+    @apply overflow-x-auto custom-scrollbar;
+  }
+  
+  /* 按钮悬停效果 */
+  .btn-hover {
+    @apply transition-all duration-200 hover:shadow-lg hover:scale-105;
+  }
+  
+  /* 卡片样式 */
+  .card {
+    @apply bg-white rounded-2xl shadow-lg border border-gray-100;
+  }
+  
+  /* 状态指示器 */
+  .status-indicator {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  
+  .status-idle {
+    @apply text-gray-600 bg-gray-100;
+  }
+  
+  .status-generating {
+    @apply text-blue-600 bg-blue-100;
+  }
+  
+  .status-succeeded {
+    @apply text-green-600 bg-green-100;
+  }
+  
+  .status-failed {
+    @apply text-red-600 bg-red-100;
+  }
+  
+  .status-stopped {
+    @apply text-orange-600 bg-orange-100;
+  }
+}
+
+@layer utilities {
+  /* 文本截断 */
+  .text-truncate {
+    @apply truncate;
+  }
+  
+  .text-truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-clamp: 2;
+  }
+  
+  .text-truncate-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-clamp: 3;
+  }
+  
+  .text-truncate-4 {
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-clamp: 4;
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-clamp: 2;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-clamp: 3;
+  }
+  
+  /* 渐变背景 */
+  .gradient-bg {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  /* 阴影效果 */
+  .shadow-soft {
+    box-shadow: 0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04);
+  }
+  
+  .shadow-strong {
+    box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+}
+
+/* 动画定义 */
+@keyframes animate-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-from-right-full {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 640px) {
+  .mobile-stack {
+    @apply flex-col space-y-2;
+  }
+  
+  .mobile-full {
+    @apply w-full;
+  }
+}
+
+/* 打印样式 */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-break {
+    page-break-before: always;
+  }
 }
