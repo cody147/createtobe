@@ -2,29 +2,28 @@
 
 import React, { useState } from 'react';
 import { 
-  Eye, 
   Download, 
   Edit3, 
   Save, 
   X,
-  RotateCcw,
   CheckCircle,
   XCircle,
   Clock,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Play
 } from 'lucide-react';
 import { GenTask } from '@/lib/types';
 import { ImageModal } from './ImageModal';
 
 interface TaskCardProps {
   task: GenTask;
-  onRetryTask: (taskId: number) => void;
   onUpdateTask: (taskId: number, updates: Partial<GenTask>) => void;
   onToggleSelection: (taskId: number) => void;
+  onGenerateSingleTask: (taskId: number) => void;
 }
 
-export function TaskCard({ task, onRetryTask, onUpdateTask, onToggleSelection }: TaskCardProps) {
+export function TaskCard({ task, onUpdateTask, onToggleSelection, onGenerateSingleTask }: TaskCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState(task.prompt);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -113,7 +112,7 @@ export function TaskCard({ task, onRetryTask, onUpdateTask, onToggleSelection }:
   return (
     <div 
       className={`
-        rounded-lg border p-3 transition-all cursor-pointer
+        rounded-lg border p-4 transition-all cursor-pointer
         ${task.selected 
           ? 'bg-blue-50 border-blue-300 shadow-sm' 
           : 'bg-white border-gray-200 hover:shadow-sm hover:border-gray-300'
@@ -121,40 +120,40 @@ export function TaskCard({ task, onRetryTask, onUpdateTask, onToggleSelection }:
       `}
       onClick={() => onToggleSelection(task.id)}
     >
-      <div className="flex items-start space-x-3">
-        {/* 左侧：序号和状态 */}
-        <div className="flex-shrink-0">
+      <div className="flex items-start space-x-4">
+        {/* 左侧：序号、状态和选中框 */}
+        <div className="flex-shrink-0 flex flex-col items-center space-y-2">
+          {/* 序号 */}
           <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
             <span className="text-xs font-medium text-gray-700">#{task.id}</span>
           </div>
-          <div className="mt-1 flex justify-center">
-            <span className={`
-              inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
-              ${getStatusColor()}
-            `}>
-              {getStatusIcon()}
-              <span className="ml-1">{getStatusText()}</span>
-            </span>
-          </div>
+          
+          {/* 状态 */}
+          <span className={`
+            inline-flex items-center px-2 py-1 rounded text-xs font-medium
+            ${getStatusColor()}
+          `}>
+            {getStatusIcon()}
+            <span className="ml-1">{getStatusText()}</span>
+          </span>
+          
           {/* 选中状态复选框 */}
-          <div className="mt-1 flex justify-center">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleSelection(task.id);
-              }}
-              className={`
-                w-5 h-5 rounded border-2 flex items-center justify-center transition-all
-                ${task.selected 
-                  ? 'bg-blue-600 border-blue-600 text-white' 
-                  : 'border-gray-300 hover:border-gray-400'
-                }
-              `}
-              title={task.selected ? '取消选中' : '选中任务'}
-            >
-              {task.selected && <CheckCircle className="w-3 h-3" />}
-            </button>
-          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSelection(task.id);
+            }}
+            className={`
+              w-6 h-6 rounded border-2 flex items-center justify-center transition-all
+              ${task.selected 
+                ? 'bg-blue-600 border-blue-600 text-white' 
+                : 'border-gray-300 hover:border-gray-400'
+              }
+            `}
+            title={task.selected ? '取消选中' : '选中任务'}
+          >
+            {task.selected && <CheckCircle className="w-4 h-4" />}
+          </button>
         </div>
 
         {/* 中间：提示词内容 */}
@@ -166,7 +165,7 @@ export function TaskCard({ task, onRetryTask, onUpdateTask, onToggleSelection }:
                 onChange={(e) => setEditingPrompt(e.target.value)}
                 onKeyDown={handleKeyDown}
                 className="w-full p-2 text-sm border border-gray-300 rounded resize-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                rows={2}
+                rows={3}
                 placeholder="输入提示词..."
                 autoFocus
               />
@@ -192,7 +191,7 @@ export function TaskCard({ task, onRetryTask, onUpdateTask, onToggleSelection }:
               e.stopPropagation();
               setIsEditing(true);
             }}>
-              <p className="text-sm text-gray-900 line-clamp-2 leading-relaxed">
+              <p className="text-sm text-gray-900 line-clamp-3 leading-relaxed">
                 {task.prompt}
               </p>
               <button className="mt-1 opacity-0 group-hover:opacity-100 inline-flex items-center text-xs text-blue-600 hover:text-blue-700 transition-all">
@@ -204,7 +203,7 @@ export function TaskCard({ task, onRetryTask, onUpdateTask, onToggleSelection }:
 
           {/* 错误信息 */}
           {task.status === 'failed' && task.errorMsg && (
-            <div className="mt-1 p-1.5 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
               <span className="font-medium">错误:</span> {task.errorMsg}
             </div>
           )}
@@ -217,56 +216,59 @@ export function TaskCard({ task, onRetryTask, onUpdateTask, onToggleSelection }:
           )}
         </div>
 
-        {/* 右侧：图片和操作 */}
-        <div className="flex-shrink-0 flex flex-col items-center space-y-1" onClick={(e) => e.stopPropagation()}>
-          {/* 图片预览 */}
+        {/* 右侧：图片和操作按钮 */}
+        <div className="flex-shrink-0 flex items-start space-x-3" onClick={(e) => e.stopPropagation()}>
+          {/* 图片预览 - 更大尺寸 */}
           {task.status === 'succeeded' && task.imageUrl ? (
-            <div className="relative">
+            <div 
+              className="relative" 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onMouseUp={(e) => e.stopPropagation()}
+            >
               <img
                 src={task.imageUrl}
                 alt={`Generated image for task ${task.id}`}
-                className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => setSelectedImage(task.imageUrl!)}
+                className="w-20 h-20 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={(e) => {
+                  e.preventDefault(); // 阻止默认行为
+                  e.stopPropagation(); // 阻止事件冒泡
+                  setSelectedImage(task.imageUrl!);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onMouseUp={(e) => e.stopPropagation()}
+                title="点击查看大图"
               />
-              <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 rounded transition-all flex items-center justify-center">
-                <Eye className="w-3 h-3 text-white opacity-0 hover:opacity-100 transition-opacity" />
-              </div>
             </div>
           ) : (
-            <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center">
+            <div className="w-20 h-20 bg-gray-100 rounded flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
               <span className="text-xs text-gray-400">暂无</span>
             </div>
           )}
 
-          {/* 操作按钮 */}
-          <div className="flex items-center space-x-1">
-            {task.status === 'failed' && (
-              <button
-                onClick={() => onRetryTask(task.id)}
-                className="p-1 text-orange-600 hover:text-orange-700 transition-colors"
-                title="重试"
-              >
-                <RotateCcw className="w-3 h-3" />
-              </button>
-            )}
+          {/* 操作按钮 - 垂直布局 */}
+          <div className="flex flex-col items-center space-y-2">
+            {/* 生成按钮 - 一直显示 */}
+            <button
+              onClick={() => onGenerateSingleTask(task.id)}
+              className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+              title="生成图片"
+            >
+              <Play className="w-4 h-4" />
+            </button>
 
+            {/* 下载按钮 - 只在成功时显示 */}
             {task.status === 'succeeded' && task.imageUrl && (
-              <>
-                <button
-                  onClick={() => setSelectedImage(task.imageUrl!)}
-                  className="p-1 text-blue-600 hover:text-blue-700 transition-colors"
-                  title="查看大图"
-                >
-                  <Eye className="w-3 h-3" />
-                </button>
-                <button
-                  onClick={handleDownloadImage}
-                  className="p-1 text-green-600 hover:text-green-700 transition-colors"
-                  title="下载图片"
-                >
-                  <Download className="w-3 h-3" />
-                </button>
-              </>
+              <button
+                onClick={handleDownloadImage}
+                className="p-2 text-green-600 hover:text-green-700 transition-colors"
+                title="下载图片"
+              >
+                <Download className="w-4 h-4" />
+              </button>
             )}
           </div>
         </div>

@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { UnifiedControlPanel } from '@/components/UnifiedControlPanel';
+import { GenerationControlPanel } from '@/components/GenerationControlPanel';
 import { TaskList } from '@/components/TaskList';
 import { ToastContainer, Toast, ToastType } from '@/components/Toast';
 import { GenTask, BatchState, CsvParseResult } from '@/lib/types';
@@ -158,23 +159,70 @@ export default function HomePage() {
     addToast('warning', '已停止生成', '正在停止所有任务...');
   }, [batchState, addToast]);
 
+  // 重新上传
+  const handleReupload = useCallback(() => {
+    // 清空当前任务
+    setBatchState({
+      tasks: [],
+      concurrency: 1,
+      isRunning: false,
+      progress: { total: 0, done: 0, success: 0, failed: 0 }
+    });
+    addToast('info', '已清空任务', '可以重新上传CSV文件');
+  }, [addToast]);
 
-  // 重试单个任务
-  const handleRetryTask = useCallback((taskId: number) => {
+
+
+  // 单条生成任务
+  const handleGenerateSingleTask = useCallback(async (taskId: number) => {
     const task = batchState.tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    // 重置任务状态
-    const updatedTask: GenTask = {
-      ...task,
-      status: 'idle',
-      attempts: 0,
-      errorMsg: undefined
-    };
+    if (batchState.isRunning) {
+      addToast('warning', '正在批量生成', '请等待当前批量生成完成后再执行单条生成');
+      return;
+    }
 
-    updateTask(updatedTask);
-    addToast('info', '任务已重置', `任务 ${taskId} 已重置为等待状态`);
-  }, [batchState.tasks, updateTask, addToast]);
+    try {
+      // 重置任务状态
+      const updatedTask: GenTask = {
+        ...task,
+        status: 'idle',
+        attempts: 0,
+        errorMsg: undefined,
+        imageUrl: undefined,
+        taskId: undefined
+      };
+      updateTask(updatedTask);
+
+      addToast('info', '开始单条生成', `正在生成任务 ${taskId} 的图片...`);
+      
+      // 创建临时的批量状态，只包含这一个任务
+      const singleTaskState: BatchState = {
+        ...batchState,
+        tasks: [updatedTask],
+        isRunning: true
+      };
+
+      // 执行单条生成
+      await runBatchGeneration(singleTaskState, updateTask);
+      
+      // 生成成功后，如果任务处于选中状态，自动取消选中
+      const finalTask = batchState.tasks.find(t => t.id === taskId);
+      if (finalTask && finalTask.status === 'succeeded' && finalTask.selected) {
+        setBatchState(prev => ({
+          ...prev,
+          tasks: prev.tasks.map(t => 
+            t.id === taskId ? { ...t, selected: false } : t
+          )
+        }));
+      }
+      
+      addToast('success', '单条生成完成', `任务 ${taskId} 生成完成，已自动取消选中`);
+    } catch (error) {
+      addToast('error', '单条生成失败', error instanceof Error ? error.message : '未知错误');
+    }
+  }, [batchState, updateTask, addToast]);
 
   // 导出结果
   const handleExportResults = useCallback(() => {
@@ -229,30 +277,46 @@ export default function HomePage() {
 
       {/* 主要内容 */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* 统一控制面板 */}
+        {/* 控制面板 */}
         <div className="mb-6">
-          <UnifiedControlPanel
-            tasks={batchState.tasks}
-            isRunning={batchState.isRunning}
-            concurrency={batchState.concurrency}
-            onConcurrencyChange={handleConcurrencyChange}
-            onCsvParsed={handleCsvParsed}
-            onClear={handleClear}
-            onStartGeneration={handleStartGeneration}
-            onStopGeneration={handleStopGeneration}
-            onExportResults={handleExportResults}
-            onSelectAll={handleSelectAll}
-            onDeselectAll={handleDeselectAll}
-          />
+          {!hasTasks ? (
+            <UnifiedControlPanel
+              tasks={batchState.tasks}
+              isRunning={batchState.isRunning}
+              concurrency={batchState.concurrency}
+              onConcurrencyChange={handleConcurrencyChange}
+              onCsvParsed={handleCsvParsed}
+              onClear={handleClear}
+              onStartGeneration={handleStartGeneration}
+              onStopGeneration={handleStopGeneration}
+              onExportResults={handleExportResults}
+              onSelectAll={handleSelectAll}
+              onDeselectAll={handleDeselectAll}
+              onReupload={handleReupload}
+            />
+          ) : (
+            <GenerationControlPanel
+              tasks={batchState.tasks}
+              isRunning={batchState.isRunning}
+              concurrency={batchState.concurrency}
+              onConcurrencyChange={handleConcurrencyChange}
+              onStartGeneration={handleStartGeneration}
+              onStopGeneration={handleStopGeneration}
+              onExportResults={handleExportResults}
+              onSelectAll={handleSelectAll}
+              onDeselectAll={handleDeselectAll}
+              onClear={handleClear}
+            />
+          )}
         </div>
 
         {/* 任务列表 */}
         {hasTasks && (
           <TaskList
             tasks={batchState.tasks}
-            onRetryTask={handleRetryTask}
             onUpdateTask={handleUpdateTask}
             onToggleSelection={handleToggleTaskSelection}
+            onGenerateSingleTask={handleGenerateSingleTask}
           />
         )}
 
