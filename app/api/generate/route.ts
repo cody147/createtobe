@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GenerateRequest, GenerateResponse, ErrorResponse } from '@/lib/types';
+import { GenerateRequest, GenerateResponse, ErrorResponse, ExternalApiResponse, ApiErrorResponse } from '@/lib/types';
 
-// 模拟生成延迟
-const GENERATION_DELAY = 2000; // 2秒
-const FAILURE_RATE = 0.1; // 10% 失败率
+// API 配置
+const API_URL = 'https://asyncdata.net/tran/https://api.apicore.ai/v1/chat/completions';
+const API_KEY = process.env.OPENAI_API_KEY || 'sk-xxxx'; // 从环境变量获取API密钥
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,35 +16,114 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 模拟生成延迟
-    await new Promise(resolve => setTimeout(resolve, GENERATION_DELAY));
-
-    // 模拟随机失败
-    if (Math.random() < FAILURE_RATE) {
+    // 检查API密钥
+    if (!API_KEY || API_KEY === 'sk-xxxx') {
       return NextResponse.json(
-        { error: 'Generation failed: Service temporarily unavailable' } as ErrorResponse,
+        { error: 'API key not configured' } as ErrorResponse,
         { status: 500 }
       );
     }
 
-    // 模拟限流
-    if (Math.random() < 0.05) { // 5% 限流概率
-      return NextResponse.json(
-        { error: 'Rate limited: Please slow down your requests' } as ErrorResponse,
-        { status: 429 }
-      );
+    // 构建请求内容
+    let content = body.prompt;
+    
+    // 如果有参考图，添加参考图信息到prompt中
+    if (body.referenceImages && body.referenceImages.length > 0) {
+      content += `\n\n参考图片数量: ${body.referenceImages.length}张`;
+      body.referenceImages.forEach((img, index) => {
+        content += `\n参考图${index + 1}: ${img.name}`;
+      });
     }
 
-    // 生成模拟的图片 URL
-    const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const imageUrl = `https://picsum.photos/512/512?random=${Date.now()}&prompt=${encodeURIComponent(body.prompt)}`;
-
-    const response: GenerateResponse = {
-      taskId,
-      imageUrl
+    // 构建请求体 - 按照你的示例格式
+    const requestBody = {
+      model: "gpt-4o-image-async",
+      stream: true,
+      messages: [
+        {
+          role: "user",
+          content: content
+        }
+      ]
     };
 
-    return NextResponse.json(response);
+    // 构建请求头 - 按照你的示例格式
+    const myHeaders = new Headers();
+    myHeaders.append("Authorization", `Bearer ${API_KEY}`);
+    myHeaders.append("Content-Type", "application/json");
+
+    // 构建请求选项 - 按照你的示例格式
+    const requestOptions = {
+      method: 'POST',
+      headers: myHeaders,
+      body: JSON.stringify(requestBody),
+      redirect: 'follow' as RequestRedirect
+    };
+
+    // 发送请求到外部API - 按照你的示例格式
+    const response = await fetch(API_URL, requestOptions);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('External API error:', errorText);
+      
+      try {
+        const errorData = JSON.parse(errorText) as ApiErrorResponse;
+        return NextResponse.json(
+          { error: `API Error: ${errorData.error.message}` } as ErrorResponse,
+          { status: response.status }
+        );
+      } catch {
+        return NextResponse.json(
+          { error: `API Error: ${errorText}` } as ErrorResponse,
+          { status: response.status }
+        );
+      }
+    }
+
+    // 按照你的示例处理响应
+    const result = await response.text();
+    console.log('External API response:', result);
+
+    try {
+      const apiResponse = JSON.parse(result) as ExternalApiResponse;
+      
+      // 检查是否有错误响应（按照你的错误示例格式）
+      if (apiResponse.error) {
+        console.error('API returned error:', apiResponse.error);
+        return NextResponse.json(
+          { error: `API Error: ${apiResponse.error}` } as ErrorResponse,
+          { status: 400 }
+        );
+      }
+
+      // 检查是否有正确的响应格式（按照你的正确示例格式）
+      if (!apiResponse.id || !apiResponse.preview_url || !apiResponse.source_url) {
+        console.error('Invalid API response format:', apiResponse);
+        return NextResponse.json(
+          { error: 'Invalid API response format' } as ErrorResponse,
+          { status: 500 }
+        );
+      }
+      
+      // 生成任务ID
+      const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      const response: GenerateResponse = {
+        taskId,
+        imageUrl: apiResponse.preview_url, // 使用预览URL作为主要图片URL
+        previewUrl: apiResponse.preview_url,
+        sourceUrl: apiResponse.source_url
+      };
+
+      return NextResponse.json(response);
+    } catch (parseError) {
+      console.error('Failed to parse API response:', parseError);
+      return NextResponse.json(
+        { error: 'Failed to parse API response' } as ErrorResponse,
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error('Generation API error:', error);
     return NextResponse.json(

@@ -45,12 +45,29 @@ export interface CsvParseResult {
 // 生成接口请求
 export interface GenerateRequest {
   prompt: string;
+  referenceImages?: File[];
 }
 
 // 生成接口响应
 export interface GenerateResponse {
   taskId: string;
   imageUrl: string;
+}
+
+// API 错误响应
+export interface ApiErrorResponse {
+  error: {
+    message: string;
+    type: string;
+  };
+}
+
+// 外部API响应 - 按照你的示例格式
+export interface ExternalApiResponse {
+  id?: string;
+  preview_url?: string;
+  source_url?: string;
+  error?: string; // 错误响应可能包含error字段
 }
 
 // 错误响应

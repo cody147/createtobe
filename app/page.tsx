@@ -24,6 +24,7 @@ export default function HomePage() {
   });
 
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [referenceImages, setReferenceImages] = useState<File[]>([]);
 
   // 添加 Toast
   const addToast = useCallback((type: ToastType, title: string, message?: string, duration?: number) => {
@@ -35,6 +36,12 @@ export default function HomePage() {
   // 移除 Toast
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
+  }, []);
+
+  // 处理参考图变更
+  const handleReferenceImagesChange = useCallback((images: File[]) => {
+    console.log('参考图变更:', images);
+    setReferenceImages(images);
   }, []);
 
   // 处理 CSV 解析结果
@@ -143,7 +150,7 @@ export default function HomePage() {
 
     try {
       addToast('info', '开始批量生成', `正在启动 ${selectedTasks.length} 个选中任务（将重新执行所有选中任务）...`);
-      await runBatchGeneration(batchState, updateTask);
+      await runBatchGeneration(batchState, updateTask, referenceImages);
       addToast('success', '批量生成完成', '所有选中任务已处理完成，成功任务已自动取消选中');
     } catch (error) {
       addToast('error', '生成失败', error instanceof Error ? error.message : '未知错误');
@@ -205,7 +212,7 @@ export default function HomePage() {
       };
 
       // 执行单条生成
-      await runBatchGeneration(singleTaskState, updateTask);
+      await runBatchGeneration(singleTaskState, updateTask, referenceImages);
       
       // 生成成功后，如果任务处于选中状态，自动取消选中
       const finalTask = batchState.tasks.find(t => t.id === taskId);
@@ -299,6 +306,7 @@ export default function HomePage() {
               tasks={batchState.tasks}
               isRunning={batchState.isRunning}
               concurrency={batchState.concurrency}
+              referenceImages={referenceImages}
               onConcurrencyChange={handleConcurrencyChange}
               onStartGeneration={handleStartGeneration}
               onStopGeneration={handleStopGeneration}
@@ -306,6 +314,7 @@ export default function HomePage() {
               onSelectAll={handleSelectAll}
               onDeselectAll={handleDeselectAll}
               onClear={handleClear}
+              onReferenceImagesChange={handleReferenceImagesChange}
             />
           )}
         </div>

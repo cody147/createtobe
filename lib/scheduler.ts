@@ -11,23 +11,105 @@ function delay(ms: number): Promise<void> {
 }
 
 /**
- * 调用生成接口
+ * 调用生成接口 - 按照 API_REQUEST_EXAMPLE.md 格式
  */
-async function callGenerateApi(prompt: string): Promise<GenerateResponse> {
-  const response = await fetch('/api/generate', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ prompt } as GenerateRequest),
+async function callGenerateApi(prompt: string, referenceImages?: File[]): Promise<GenerateResponse> {
+  // 构建请求内容
+  let content = prompt;
+  
+  // 如果有参考图，添加参考图信息到prompt中
+  // if (referenceImages && referenceImages.length > 0) {
+  //   content += `\n\n参考图片数量: ${referenceImages.length}张`;
+  //   referenceImages.forEach((img, index) => {
+  //     content += `\n参考图${index + 1}: ${img.name}`;
+  //   });
+  // }
+
+  // 获取API密钥
+  const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || 'sk-xxxx';
+  
+  // 构建请求头 - 按照示例格式
+  const myHeaders = new Headers();
+  myHeaders.append("Authorization", `Bearer ${apiKey}`);
+  myHeaders.append("Content-Type", "application/json");
+
+  // 构建请求体 - 按照示例格式
+  const raw = JSON.stringify({
+    "model": "sora_image",
+    "messages": [
+      {
+        "role": "user",
+        "content": content
+      }
+    ],
+    "stream": false
   });
 
+  // 构建请求选项 - 按照示例格式
+  const requestOptions = {
+    method: 'POST',
+    headers: myHeaders,
+    body: raw,
+    redirect: 'follow' as RequestRedirect
+  };
+
+  // 发送请求 - 按照示例格式
+  const response = await fetch("https://ismaque.org/v1/chat/completions", requestOptions);
+
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(errorData.error || `HTTP ${response.status}`);
+    const errorText = await response.text();
+    console.error('API error:', errorText);
+    throw new Error(`HTTP ${response.status}: ${errorText}`);
   }
 
-  return response.json();
+  // 处理响应 - 按照Python代码格式解析
+  const data = await response.json();
+  console.log('API response:', data);
+
+  try {
+    // 检查错误响应格式
+    if (data.error) {
+      throw new Error(`API Error: ${data.error}`);
+    }
+
+    // 从返回的markdown中提取图片URL - 按照Python代码逻辑
+    const content = data["choices"][0]["message"]["content"];
+    console.log('Response content:', content);
+
+    // 尝试两种格式的图片URL - 按照Python代码逻辑
+    let imageUrl = '';
+    
+    // 尝试匹配 [点击下载](url) 格式
+    const downloadMatch = content.match(/\[点击下载\]\((.*?)\)/);
+    if (downloadMatch) {
+      imageUrl = downloadMatch[1];
+      console.log('成功提取图片URL (点击下载格式):', imageUrl);
+    } else {
+      // 尝试匹配 ![图片](url) 格式
+      const imageMatch = content.match(/!\[图片\]\((.*?)\)/);
+      if (imageMatch) {
+        imageUrl = imageMatch[1];
+        console.log('成功提取图片URL (图片格式):', imageUrl);
+      }
+    }
+
+    if (!imageUrl) {
+      const errorMsg = "响应中没有找到图片URL";
+      console.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    // 生成任务ID
+    const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return {
+      taskId,
+      imageUrl: imageUrl
+    };
+  } catch (parseError) {
+    console.error('Failed to parse API response:', parseError);
+    throw new Error('Failed to parse API response');
+  }
 }
 
 /**
@@ -36,14 +118,15 @@ async function callGenerateApi(prompt: string): Promise<GenerateResponse> {
 async function runSingleTask(
   task: GenTask, 
   state: BatchState,
-  onUpdate: (task: GenTask) => void
+  onUpdate: (task: GenTask) => void,
+  referenceImages?: File[]
 ): Promise<void> {
   task.status = 'generating';
   task.attempts++;
   onUpdate({ ...task });
 
   try {
-    const result = await callGenerateApi(task.prompt);
+    const result = await callGenerateApi(task.prompt, referenceImages);
     
     task.taskId = result.taskId;
     task.imageUrl = result.imageUrl;
@@ -56,7 +139,7 @@ async function runSingleTask(
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
     // 判断是否需要重试
-    if (task.attempts < 3 && shouldRetry(errorMessage)) {
+    if (task.attempts < 0 && shouldRetry(errorMessage)) {
       // 指数退避重试
       const delayMs = Math.pow(2, task.attempts - 1) * 1000;
       await delay(delayMs);
@@ -65,7 +148,7 @@ async function runSingleTask(
       onUpdate({ ...task });
       
       // 递归重试
-      return runSingleTask(task, state, onUpdate);
+      return runSingleTask(task, state, onUpdate, referenceImages);
     } else {
       // 超过重试次数，标记为失败
       task.status = 'failed';
@@ -103,7 +186,8 @@ function shouldRetry(errorMessage: string): boolean {
 async function worker(
   tasks: GenTask[],
   state: BatchState,
-  onUpdate: (task: GenTask) => void
+  onUpdate: (task: GenTask) => void,
+  referenceImages?: File[]
 ): Promise<void> {
   while (state.isRunning && tasks.length > 0) {
     const task = tasks.shift();
@@ -111,7 +195,7 @@ async function worker(
     
     // 处理所有状态为 idle 的任务
     if (task.status === 'idle') {
-      await runSingleTask(task, state, onUpdate);
+      await runSingleTask(task, state, onUpdate, referenceImages);
     }
   }
 }
@@ -121,7 +205,8 @@ async function worker(
  */
 export async function runBatchGeneration(
   state: BatchState,
-  onUpdate: (task: GenTask) => void
+  onUpdate: (task: GenTask) => void,
+  referenceImages?: File[]
 ): Promise<void> {
   state.isRunning = true;
   
@@ -153,7 +238,7 @@ export async function runBatchGeneration(
   const taskQueue = [...pendingTasks];
   
   for (let i = 0; i < state.concurrency; i++) {
-    workers.push(worker(taskQueue, state, onUpdate));
+    workers.push(worker(taskQueue, state, onUpdate, referenceImages));
   }
   
   // 等待所有工作线程完成
