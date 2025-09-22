@@ -12,18 +12,20 @@ interface TaskListProps {
 
 export function TaskList({ tasks, onUpdateTask, onToggleSelection }: TaskListProps) {
   return (
-    <div className="space-y-2">
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       {tasks.length > 0 ? (
-        tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            onUpdateTask={onUpdateTask}
-            onToggleSelection={onToggleSelection}
-          />
-        ))
+        <div className="divide-y divide-gray-100">
+          {tasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              onUpdateTask={onUpdateTask}
+              onToggleSelection={onToggleSelection}
+            />
+          ))}
+        </div>
       ) : (
-        <div className="text-center py-8 bg-white rounded-lg border border-gray-200">
+        <div className="text-center py-8">
           <div className="text-gray-400 mb-2">
             <div className="w-10 h-10 mx-auto bg-gray-100 rounded-full flex items-center justify-center">
               <span className="text-xl">📝</span>

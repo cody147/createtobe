@@ -23,6 +23,8 @@ export function ImageModal({ imageUrl, onClose }: ImageModalProps) {
 
   // 处理背景点击关闭
   const handleBackdropClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (e.target === e.currentTarget) {
       onClose();
     }
@@ -43,11 +45,24 @@ export function ImageModal({ imageUrl, onClose }: ImageModalProps) {
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
       onClick={handleBackdropClick}
+      onMouseDown={(e) => e.stopPropagation()}
+      onMouseUp={(e) => e.stopPropagation()}
     >
-      <div className="relative max-w-4xl max-h-[90vh] w-full mx-4">
+      <div 
+        className="relative max-w-4xl max-h-[90vh] w-full mx-4"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onMouseUp={(e) => e.stopPropagation()}
+      >
         {/* 关闭按钮 */}
         <button
-          onClick={onClose}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onMouseUp={(e) => e.stopPropagation()}
           className="absolute -top-12 right-0 z-10 p-2 text-white hover:text-gray-300 transition-colors"
           aria-label="关闭预览"
         >
@@ -59,7 +74,13 @@ export function ImageModal({ imageUrl, onClose }: ImageModalProps) {
           {/* 操作栏 */}
           <div className="absolute top-4 right-4 z-10 flex items-center space-x-2">
             <button
-              onClick={handleDownload}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDownload();
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onMouseUp={(e) => e.stopPropagation()}
               className="p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-lg shadow-lg transition-all"
               title="下载图片"
             >
@@ -67,7 +88,13 @@ export function ImageModal({ imageUrl, onClose }: ImageModalProps) {
             </button>
             
             <button
-              onClick={handleOpenInNewTab}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleOpenInNewTab();
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onMouseUp={(e) => e.stopPropagation()}
               className="p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-lg shadow-lg transition-all"
               title="在新标签页中打开"
             >

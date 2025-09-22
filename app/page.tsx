@@ -263,6 +263,23 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* 固定的表头 */}
+      {hasTasks && (
+        <div className="bg-white border-b flex-shrink-0">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="bg-gray-50 border-b border-gray-200">
+              <div className="grid grid-cols-12 px-4 py-3">
+                <div className="col-span-1 text-xs font-medium text-gray-700 border-r border-gray-300 pr-4">编号</div>
+                <div className="col-span-6 text-xs font-medium text-gray-700 border-r border-gray-300 px-4">提示词</div>
+                <div className="col-span-2 text-xs font-medium text-gray-700 border-r border-gray-300 px-4">状态</div>
+                <div className="col-span-2 text-xs font-medium text-gray-700 border-r border-gray-300 px-4">生成图片</div>
+                <div className="col-span-1 text-xs font-medium text-gray-700 pl-4">操作</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 可滚动的主要内容区域 */}
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
