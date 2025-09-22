@@ -179,13 +179,18 @@ async function runSingleTask(
   onUpdate: (task: GenTask) => void,
   referenceImages?: File[]
 ): Promise<void> {
+  console.log(`🎬 开始执行任务 ${task.id}, 当前状态: ${task.status}`);
+  
   task.status = 'generating';
   task.attempts++;
+  console.log(`🔄 更新任务状态为 generating, 尝试次数: ${task.attempts}`);
   onUpdate({ ...task });
 
   try {
+    console.log(`🚀 调用生成API, prompt: ${task.prompt.substring(0, 50)}...`);
     const result = await callGenerateApi(task.prompt, referenceImages);
     
+    console.log(`✅ 生成成功, taskId: ${result.taskId}, imageUrl: ${result.imageUrl}`);
     task.taskId = result.taskId;
     task.imageUrl = result.imageUrl;
     task.status = 'succeeded';
@@ -193,11 +198,14 @@ async function runSingleTask(
     task.selected = false; // 生成成功后自动取消选中状态
     
     state.progress.success++;
+    console.log(`🎉 任务 ${task.id} 执行成功`);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`❌ 任务 ${task.id} 执行失败:`, errorMessage);
     
     // 判断是否需要重试
-    if (task.attempts < 0 && shouldRetry(errorMessage)) {
+    if (task.attempts < 3 && shouldRetry(errorMessage)) {
+      console.log(`🔄 准备重试任务 ${task.id}, 当前尝试次数: ${task.attempts}`);
       // 指数退避重试
       const delayMs = Math.pow(2, task.attempts - 1) * 1000;
       await delay(delayMs);
@@ -209,12 +217,14 @@ async function runSingleTask(
       return runSingleTask(task, state, onUpdate, referenceImages);
     } else {
       // 超过重试次数，标记为失败
+      console.log(`💀 任务 ${task.id} 重试次数已用完，标记为失败`);
       task.status = 'failed';
       task.errorMsg = errorMessage;
       state.progress.failed++;
     }
   } finally {
     state.progress.done++;
+    console.log(`🏁 任务 ${task.id} 完成，最终状态: ${task.status}`);
     onUpdate({ ...task });
   }
 }
@@ -247,15 +257,27 @@ async function worker(
   onUpdate: (task: GenTask) => void,
   referenceImages?: File[]
 ): Promise<void> {
+  console.log(`🔧 工作线程启动, 待处理任务数: ${tasks.length}, 运行状态: ${state.isRunning}`);
+  
   while (state.isRunning && tasks.length > 0) {
     const task = tasks.shift();
-    if (!task) break;
+    if (!task) {
+      console.log('🔚 工作线程: 没有更多任务');
+      break;
+    }
+    
+    console.log(`📋 工作线程: 处理任务 ${task.id}, 状态: ${task.status}`);
     
     // 处理所有状态为 idle 的任务
     if (task.status === 'idle') {
+      console.log(`✅ 工作线程: 任务 ${task.id} 状态为 idle，开始执行`);
       await runSingleTask(task, state, onUpdate, referenceImages);
+    } else {
+      console.log(`⏭️ 工作线程: 跳过任务 ${task.id}，状态为 ${task.status}`);
     }
   }
+  
+  console.log('🏁 工作线程结束');
 }
 
 /**
@@ -266,6 +288,13 @@ export async function runBatchGeneration(
   onUpdate: (task: GenTask) => void,
   referenceImages?: File[]
 ): Promise<void> {
+  console.log('🚀 runBatchGeneration 开始执行');
+  console.log('📊 当前状态:', {
+    isRunning: state.isRunning,
+    concurrency: state.concurrency,
+    totalTasks: state.tasks.length
+  });
+  
   state.isRunning = true;
   
   // 重置进度
@@ -275,14 +304,18 @@ export async function runBatchGeneration(
   
   // 获取待处理的任务（只处理选中的任务，不管之前状态如何）
   const pendingTasks = state.tasks.filter(task => task.selected);
+  console.log(`📋 找到 ${pendingTasks.length} 个选中的任务`);
   
   if (pendingTasks.length === 0) {
+    console.log('⚠️ 没有选中的任务，退出');
     state.isRunning = false;
     return;
   }
   
   // 重置所有选中任务的状态，准备重新执行
+  console.log('🔄 重置所有选中任务的状态');
   pendingTasks.forEach(task => {
+    console.log(`重置任务 ${task.id}: ${task.status} -> idle`);
     task.status = 'idle';
     task.attempts = 0;
     task.imageUrl = undefined;
@@ -294,16 +327,20 @@ export async function runBatchGeneration(
   // 创建并发工作线程
   const workers: Promise<void>[] = [];
   const taskQueue = [...pendingTasks];
+  console.log(`🔧 创建 ${state.concurrency} 个工作线程，任务队列长度: ${taskQueue.length}`);
   
   for (let i = 0; i < state.concurrency; i++) {
     workers.push(worker(taskQueue, state, onUpdate, referenceImages));
   }
   
   // 等待所有工作线程完成
+  console.log('⏳ 等待所有工作线程完成...');
   await Promise.all(workers);
+  console.log('✅ 所有工作线程完成');
   
   // 任务完成后，重置运行状态
   state.isRunning = false;
+  console.log('🏁 runBatchGeneration 执行完成');
 }
 
 /**

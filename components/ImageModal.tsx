@@ -76,17 +76,33 @@ export function ImageModal({ imageUrl, onClose }: ImageModalProps) {
           </div>
 
           {/* 图片 */}
-          <div className="flex items-center justify-center p-4">
+          <div className="flex items-center justify-center p-4 relative">
             <img
+              key={imageUrl} // 使用key强制重新渲染
               src={imageUrl}
               alt="Generated image preview"
               className="max-w-full max-h-[80vh] object-contain rounded-lg"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '80vh',
+                objectFit: 'contain'
+              }}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = 'none';
+                // 创建错误提示
                 const errorDiv = document.createElement('div');
-                errorDiv.className = 'flex items-center justify-center h-64 text-gray-500';
-                errorDiv.textContent = '图片加载失败';
+                errorDiv.className = 'flex items-center justify-center h-64 w-full';
+                errorDiv.innerHTML = `
+                  <div class="flex flex-col items-center space-y-3">
+                    <div class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                      <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                      </svg>
+                    </div>
+                    <span class="text-sm text-red-500">图片加载失败</span>
+                  </div>
+                `;
                 target.parentNode?.appendChild(errorDiv);
               }}
             />

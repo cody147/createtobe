@@ -217,8 +217,10 @@ export function GenerationControlPanel({
               className="px-1.5 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
             >
               <option value={1}>1</option>
-              <option value={2}>2</option>
-              <option value={3}>3</option>
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={30}>30</option>
             </select>
           </div>
 

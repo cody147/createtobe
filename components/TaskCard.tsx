@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Download, 
   Edit3, 
@@ -10,8 +10,7 @@ import {
   XCircle,
   Clock,
   Loader2,
-  AlertCircle,
-  Play
+  AlertCircle
 } from 'lucide-react';
 import { GenTask } from '@/lib/types';
 import { ImageModal } from './ImageModal';
@@ -20,13 +19,17 @@ interface TaskCardProps {
   task: GenTask;
   onUpdateTask: (taskId: number, updates: Partial<GenTask>) => void;
   onToggleSelection: (taskId: number) => void;
-  onGenerateSingleTask: (taskId: number) => void;
 }
 
-export function TaskCard({ task, onUpdateTask, onToggleSelection, onGenerateSingleTask }: TaskCardProps) {
+export function TaskCard({ task, onUpdateTask, onToggleSelection }: TaskCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState(task.prompt);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+  // 当编辑提示词时，同步状态
+  useEffect(() => {
+    setEditingPrompt(task.prompt);
+  }, [task.prompt]);
 
   const getStatusIcon = () => {
     switch (task.status) {
@@ -187,14 +190,23 @@ export function TaskCard({ task, onUpdateTask, onToggleSelection, onGenerateSing
               </div>
             </div>
           ) : (
-            <div className="group cursor-pointer" onClick={(e) => {
-              e.stopPropagation();
-              setIsEditing(true);
-            }}>
-              <p className="text-sm text-gray-900 line-clamp-3 leading-relaxed">
+            <div className="group cursor-pointer">
+              <p 
+                className="text-sm text-gray-900 line-clamp-3 leading-relaxed"
+                onClick={(e) => {
+                  // 点击提示词文本时，让事件冒泡到父级，执行选中逻辑
+                  // 不调用 e.stopPropagation()，也不调用 setIsEditing()
+                }}
+              >
                 {task.prompt}
               </p>
-              <button className="mt-1 opacity-0 group-hover:opacity-100 inline-flex items-center text-xs text-blue-600 hover:text-blue-700 transition-all">
+              <button 
+                className="mt-1 opacity-0 group-hover:opacity-100 inline-flex items-center text-xs text-blue-600 hover:text-blue-700 transition-all"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsEditing(true);
+                }}
+              >
                 <Edit3 className="w-3 h-3 mr-1" />
                 编辑
               </button>
@@ -218,10 +230,10 @@ export function TaskCard({ task, onUpdateTask, onToggleSelection, onGenerateSing
 
         {/* 右侧：图片和操作按钮 */}
         <div className="flex-shrink-0 flex items-start space-x-3" onClick={(e) => e.stopPropagation()}>
-          {/* 图片预览 - 更大尺寸 */}
+          {/* 图片预览 - 简化版本 */}
           {task.status === 'succeeded' && task.imageUrl ? (
             <div 
-              className="relative" 
+              className="relative w-20 h-20" 
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -230,17 +242,32 @@ export function TaskCard({ task, onUpdateTask, onToggleSelection, onGenerateSing
               onMouseUp={(e) => e.stopPropagation()}
             >
               <img
+                key={task.imageUrl} // 使用key强制重新渲染
                 src={task.imageUrl}
                 alt={`Generated image for task ${task.id}`}
                 className="w-20 h-20 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
+                style={{
+                  width: '80px',
+                  height: '80px',
+                  objectFit: 'cover'
+                }}
                 onClick={(e) => {
-                  e.preventDefault(); // 阻止默认行为
-                  e.stopPropagation(); // 阻止事件冒泡
+                  e.preventDefault();
+                  e.stopPropagation();
                   setSelectedImage(task.imageUrl!);
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
                 onMouseUp={(e) => e.stopPropagation()}
                 title="点击查看大图"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  // 创建错误提示
+                  const errorDiv = document.createElement('div');
+                  errorDiv.className = 'w-20 h-20 bg-red-50 rounded flex items-center justify-center';
+                  errorDiv.innerHTML = '<span class="text-xs text-red-400">加载失败</span>';
+                  target.parentNode?.appendChild(errorDiv);
+                }}
               />
             </div>
           ) : (
@@ -249,17 +276,8 @@ export function TaskCard({ task, onUpdateTask, onToggleSelection, onGenerateSing
             </div>
           )}
 
-          {/* 操作按钮 - 垂直布局 */}
-          <div className="flex flex-col items-center space-y-2">
-            {/* 生成按钮 - 一直显示 */}
-            <button
-              onClick={() => onGenerateSingleTask(task.id)}
-              className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-              title="生成图片"
-            >
-              <Play className="w-4 h-4" />
-            </button>
-
+          {/* 操作按钮 */}
+          <div className="flex items-center">
             {/* 下载按钮 - 只在成功时显示 */}
             {task.status === 'succeeded' && task.imageUrl && (
               <button

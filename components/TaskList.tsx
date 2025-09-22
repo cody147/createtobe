@@ -8,10 +8,9 @@ interface TaskListProps {
   tasks: GenTask[];
   onUpdateTask: (taskId: number, updates: Partial<GenTask>) => void;
   onToggleSelection: (taskId: number) => void;
-  onGenerateSingleTask: (taskId: number) => void;
 }
 
-export function TaskList({ tasks, onUpdateTask, onToggleSelection, onGenerateSingleTask }: TaskListProps) {
+export function TaskList({ tasks, onUpdateTask, onToggleSelection }: TaskListProps) {
   return (
     <div className="space-y-2">
       {tasks.length > 0 ? (
@@ -21,7 +20,6 @@ export function TaskList({ tasks, onUpdateTask, onToggleSelection, onGenerateSin
             task={task}
             onUpdateTask={onUpdateTask}
             onToggleSelection={onToggleSelection}
-            onGenerateSingleTask={onGenerateSingleTask}
           />
         ))
       ) : (

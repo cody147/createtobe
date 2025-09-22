@@ -180,56 +180,6 @@ export default function HomePage() {
 
 
 
-  // 单条生成任务
-  const handleGenerateSingleTask = useCallback(async (taskId: number) => {
-    const task = batchState.tasks.find(t => t.id === taskId);
-    if (!task) return;
-
-    if (batchState.isRunning) {
-      addToast('warning', '正在批量生成', '请等待当前批量生成完成后再执行单条生成');
-      return;
-    }
-
-    try {
-      // 重置任务状态
-      const updatedTask: GenTask = {
-        ...task,
-        status: 'idle',
-        attempts: 0,
-        errorMsg: undefined,
-        imageUrl: undefined,
-        taskId: undefined
-      };
-      updateTask(updatedTask);
-
-      addToast('info', '开始单条生成', `正在生成任务 ${taskId} 的图片...`);
-      
-      // 创建临时的批量状态，只包含这一个任务
-      const singleTaskState: BatchState = {
-        ...batchState,
-        tasks: [updatedTask],
-        isRunning: true
-      };
-
-      // 执行单条生成
-      await runBatchGeneration(singleTaskState, updateTask, referenceImages);
-      
-      // 生成成功后，如果任务处于选中状态，自动取消选中
-      const finalTask = batchState.tasks.find(t => t.id === taskId);
-      if (finalTask && finalTask.status === 'succeeded' && finalTask.selected) {
-        setBatchState(prev => ({
-          ...prev,
-          tasks: prev.tasks.map(t => 
-            t.id === taskId ? { ...t, selected: false } : t
-          )
-        }));
-      }
-      
-      addToast('success', '单条生成完成', `任务 ${taskId} 生成完成，已自动取消选中`);
-    } catch (error) {
-      addToast('error', '单条生成失败', error instanceof Error ? error.message : '未知错误');
-    }
-  }, [batchState, updateTask, addToast]);
 
   // 导出结果
   const handleExportResults = useCallback(() => {
@@ -325,7 +275,6 @@ export default function HomePage() {
             tasks={batchState.tasks}
             onUpdateTask={handleUpdateTask}
             onToggleSelection={handleToggleTaskSelection}
-            onGenerateSingleTask={handleGenerateSingleTask}
           />
         )}
 
