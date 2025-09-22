@@ -214,28 +214,21 @@ export default function HomePage() {
   const hasTasks = batchState.tasks.length > 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       {/* 头部 */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-white border-b flex-shrink-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
+          <div className="flex justify-between items-center py-3">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">批量文生图工具</h1>
-              <p className="mt-1 text-sm text-gray-500">
-                上传 CSV 文件，批量生成图片，支持并发控制和结果导出
-              </p>
-            </div>
-            <div className="text-sm text-gray-500">
-              v1.0.0
+              <h1 className="text-xl font-semibold text-gray-900">批量文生图工具</h1>
             </div>
           </div>
         </div>
       </header>
 
-      {/* 主要内容 */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* 控制面板 */}
-        <div className="mb-6">
+      {/* 固定的控制面板 */}
+      <div className="bg-white border-b flex-shrink-0">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           {!hasTasks ? (
             <UnifiedControlPanel
               tasks={batchState.tasks}
@@ -268,28 +261,34 @@ export default function HomePage() {
             />
           )}
         </div>
+      </div>
 
-        {/* 任务列表 */}
-        {hasTasks && (
-          <TaskList
-            tasks={batchState.tasks}
-            onUpdateTask={handleUpdateTask}
-            onToggleSelection={handleToggleTaskSelection}
-          />
-        )}
+      {/* 可滚动的主要内容区域 */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
-        {/* 空状态 */}
-        {!hasTasks && (
-          <div className="text-center py-12">
-            <div className="mx-auto h-24 w-24 text-gray-400 mb-4">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+          {/* 任务列表 */}
+          {hasTasks && (
+            <TaskList
+              tasks={batchState.tasks}
+              onUpdateTask={handleUpdateTask}
+              onToggleSelection={handleToggleTaskSelection}
+            />
+          )}
+
+          {/* 空状态 */}
+          {!hasTasks && (
+            <div className="text-center py-12">
+              <div className="mx-auto h-24 w-24 text-gray-400 mb-4">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">还没有任务</h3>
+              <p className="text-gray-500">请上传 CSV 文件开始批量生成图片</p>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">还没有任务</h3>
-            <p className="text-gray-500">请上传 CSV 文件开始批量生成图片</p>
-          </div>
-        )}
+          )}
+        </div>
       </main>
 
       {/* Toast 通知 */}
