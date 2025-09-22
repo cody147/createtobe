@@ -11,19 +11,73 @@ function delay(ms: number): Promise<void> {
 }
 
 /**
+ * 将File对象转换为base64 URL
+ */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Failed to convert file to base64'));
+      }
+    };
+    reader.onerror = () => reject(new Error('FileReader error'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
  * 调用生成接口 - 按照 API_REQUEST_EXAMPLE.md 格式
  */
 async function callGenerateApi(prompt: string, referenceImages?: File[]): Promise<GenerateResponse> {
-  // 构建请求内容
-  let content = prompt;
+  // 构建消息内容 - 按照Python代码格式
+  let content: Array<{type: string, text?: string, image_url?: {url: string}}> = [
+    {"type": "text", "text": prompt}
+  ];
   
-  // 如果有参考图，添加参考图信息到prompt中
-  // if (referenceImages && referenceImages.length > 0) {
-  //   content += `\n\n参考图片数量: ${referenceImages.length}张`;
-  //   referenceImages.forEach((img, index) => {
-  //     content += `\n参考图${index + 1}: ${img.name}`;
-  //   });
-  // }
+  let newPrompt = prompt;
+
+  
+  // 添加图片（支持File对象）
+  if (referenceImages && referenceImages.length > 0) {
+    for (let index = 0; index < referenceImages.length; index++) {
+      const img = referenceImages[index];
+      
+      // 检查prompt中是否包含文件名
+      const fileName = img.name.replace(/\.[^/.]+$/, ''); // 去掉文件扩展名
+      const isFileNameInPrompt = prompt.toLowerCase().includes(fileName.toLowerCase());
+      
+      if (!isFileNameInPrompt) {
+        console.log(`跳过图片 ${img.name}：prompt中不包含文件名 ${fileName}`);
+        continue;
+      }
+      
+      try {
+        // 将File对象转换为base64
+        const base64Url = await fileToBase64(img);
+        if (base64Url) {
+          content.push({
+            "type": "image_url",
+            "image_url": {"url": base64Url}
+          });
+          newPrompt += `\n${fileName}使用图${index + 1}中角色图片`;
+          // 记录路径信息用于日志
+          console.log(`添加参考图片: ${fileName}`);
+        } else {
+          console.warn(`参考图片转换base64失败: ${img.name}`);
+        }
+      } catch (error) {
+        console.warn(`处理参考图片失败: ${img.name}`, error);
+      }
+    }
+  }
+
+  // 更新content中的文本内容
+  content[0] = {"type": "text", "text": newPrompt};
+
+  console.log(`更改后的prompt: ${newPrompt}`);
 
   // 获取API密钥
   const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || 'sk-xxxx';
@@ -33,10 +87,14 @@ async function callGenerateApi(prompt: string, referenceImages?: File[]): Promis
   myHeaders.append("Authorization", `Bearer ${apiKey}`);
   myHeaders.append("Content-Type", "application/json");
 
-  // 构建请求体 - 按照示例格式
+  // 构建请求体 - 按照Python代码格式
   const raw = JSON.stringify({
     "model": "sora_image",
     "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful assistant."
+      },
       {
         "role": "user",
         "content": content
