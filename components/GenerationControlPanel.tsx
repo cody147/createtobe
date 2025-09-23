@@ -215,7 +215,7 @@ export function GenerationControlPanel({
               <button
                 onClick={onSelectAll}
                 disabled={isRunning}
-                className="px-2 py-1.5 bg-gray-600 text-white rounded text-xs font-medium hover:bg-gray-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-2 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
                 title="全选所有任务"
               >
                 全选
@@ -223,10 +223,10 @@ export function GenerationControlPanel({
               <button
                 onClick={onDeselectAll}
                 disabled={isRunning}
-                className="px-2 py-1.5 bg-gray-500 text-white rounded text-xs font-medium hover:bg-gray-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                title="取消全选"
+                className="px-2 py-1.5 bg-orange-500 text-white rounded text-xs font-medium hover:bg-orange-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+                title="清空选择"
               >
-                反选
+                清空选择
               </button>
             </div>
 
@@ -271,10 +271,10 @@ export function GenerationControlPanel({
             {/* 清空按钮 */}
             <button
               onClick={onClear}
-              className="px-2 py-1.5 bg-gray-500 text-white rounded text-xs font-medium hover:bg-gray-600 transition-all flex items-center space-x-1"
+              className="px-2 py-1.5 bg-red-500 text-white rounded text-xs font-medium hover:bg-red-600 transition-all flex items-center space-x-1 shadow-sm hover:shadow-md"
               title="清空所有任务"
             >
-              <span>清空</span>
+              <span>清空任务</span>
             </button>
           </div>
         </div>
