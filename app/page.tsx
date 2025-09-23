@@ -193,7 +193,9 @@ export default function HomePage() {
         failed: 0
       }
     });
-    addToast('info', '已清空所有任务');
+    // 同时清空参考图
+    setReferenceImages([]);
+    addToast('info', '已清空所有任务和参考图');
   }, [addToast]);
 
   // 全选/反全选
