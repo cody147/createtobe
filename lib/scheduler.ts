@@ -31,7 +31,7 @@ function fileToBase64(file: File): Promise<string> {
 /**
  * 调用生成接口 - 按照 API_REQUEST_EXAMPLE.md 格式
  */
-async function callGenerateApi(prompt: string, referenceImages?: File[], settings?: { apiKey: string; style?: any; aspectRatio?: string }): Promise<GenerateResponse> {
+async function callGenerateApi(prompt: string, referenceImages?: File[], settings?: { apiKey: string; style?: any; aspectRatio?: string }, abortController?: AbortController): Promise<GenerateResponse> {
   // 构建消息内容 - 按照Python代码格式
   let content: Array<{type: string, text?: string, image_url?: {url: string}}> = [
     {"type": "text", "text": prompt}
@@ -128,7 +128,10 @@ async function callGenerateApi(prompt: string, referenceImages?: File[], setting
   };
 
   // 发送请求 - 按照示例格式
-  const response = await fetch("https://ismaque.org/v1/chat/completions", requestOptions);
+  const response = await fetch("https://ismaque.org/v1/chat/completions", {
+    ...requestOptions,
+    signal: abortController?.signal
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -198,6 +201,14 @@ async function runSingleTask(
 ): Promise<void> {
   console.log(`🎬 开始执行任务 ${task.id}, 当前状态: ${task.status}`);
   
+  // 检查是否已经停止
+  if (!state.isRunning) {
+    console.log(`🛑 任务 ${task.id} 被停止，跳过执行`);
+    task.status = 'stopped';
+    onUpdate({ ...task });
+    return;
+  }
+  
   task.status = 'generating';
   task.attempts++;
   console.log(`🔄 更新任务状态为 generating, 尝试次数: ${task.attempts}`);
@@ -205,7 +216,15 @@ async function runSingleTask(
 
   try {
     console.log(`🚀 调用生成API, prompt: ${task.prompt.substring(0, 50)}...`);
-    const result = await callGenerateApi(task.prompt, referenceImages, settings);
+    const result = await callGenerateApi(task.prompt, referenceImages, settings, state.abortController);
+    
+    // 检查是否在API调用期间被停止
+    if (!state.isRunning) {
+      console.log(`🛑 任务 ${task.id} 在API调用后被停止`);
+      task.status = 'stopped';
+      onUpdate({ ...task });
+      return;
+    }
     
     console.log(`✅ 生成成功, taskId: ${result.taskId}, imageUrl: ${result.imageUrl}`);
     task.taskId = result.taskId;
@@ -217,6 +236,22 @@ async function runSingleTask(
     state.progress.success++;
     console.log(`🎉 任务 ${task.id} 执行成功`);
   } catch (error) {
+    // 检查是否被停止
+    if (!state.isRunning) {
+      console.log(`🛑 任务 ${task.id} 在错误处理时被停止`);
+      task.status = 'stopped';
+      onUpdate({ ...task });
+      return;
+    }
+    
+    // 检查是否是AbortError（请求被取消）
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.log(`🛑 任务 ${task.id} 的API请求被取消`);
+      task.status = 'stopped';
+      onUpdate({ ...task });
+      return;
+    }
+    
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error(`❌ 任务 ${task.id} 执行失败:`, errorMessage);
     
@@ -227,11 +262,19 @@ async function runSingleTask(
       const delayMs = Math.pow(2, task.attempts - 1) * 1000;
       await delay(delayMs);
       
+      // 检查是否在重试延迟期间被停止
+      if (!state.isRunning) {
+        console.log(`🛑 任务 ${task.id} 在重试延迟后被停止`);
+        task.status = 'stopped';
+        onUpdate({ ...task });
+        return;
+      }
+      
       task.status = 'idle';
       onUpdate({ ...task });
       
       // 递归重试
-      return runSingleTask(task, state, onUpdate, referenceImages);
+      return runSingleTask(task, state, onUpdate, referenceImages, settings);
     } else {
       // 超过重试次数，标记为失败
       console.log(`💀 任务 ${task.id} 重试次数已用完，标记为失败`);
@@ -240,7 +283,10 @@ async function runSingleTask(
       state.progress.failed++;
     }
   } finally {
-    state.progress.done++;
+    // 只有在任务真正完成时才更新进度
+    if (task.status === 'succeeded' || task.status === 'failed') {
+      state.progress.done++;
+    }
     console.log(`🏁 任务 ${task.id} 完成，最终状态: ${task.status}`);
     onUpdate({ ...task });
   }
@@ -316,6 +362,10 @@ export async function runBatchGeneration(
   
   state.isRunning = true;
   
+  // 创建新的AbortController
+  state.abortController = new AbortController();
+  console.log('🎛️ 创建新的AbortController');
+  
   // 重置进度
   state.progress.done = 0;
   state.progress.success = 0;
@@ -366,14 +416,33 @@ export async function runBatchGeneration(
  * 停止批量生成
  */
 export function stopBatchGeneration(state: BatchState): void {
+  console.log('🛑 停止批量生成被调用');
+  console.log('📊 停止前状态:', {
+    isRunning: state.isRunning,
+    generatingTasks: state.tasks.filter(t => t.status === 'generating').length,
+    totalTasks: state.tasks.length
+  });
+  
   state.isRunning = false;
   
+  // 取消所有正在进行的API请求
+  if (state.abortController) {
+    console.log('🛑 取消所有正在进行的API请求');
+    state.abortController.abort();
+    state.abortController = undefined;
+  }
+  
   // 将正在生成的任务标记为停止
+  let stoppedCount = 0;
   state.tasks.forEach(task => {
     if (task.status === 'generating') {
       task.status = 'stopped';
+      stoppedCount++;
+      console.log(`🛑 任务 ${task.id} 被标记为停止`);
     }
   });
+  
+  console.log(`🛑 批量生成已停止，共停止了 ${stoppedCount} 个正在运行的任务`);
 }
 
 /**

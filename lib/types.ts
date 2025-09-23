@@ -27,6 +27,7 @@ export interface BatchState {
   concurrency: number;      // 默认 1；可支持 1~3
   isRunning: boolean;
   originalCsvFilename?: string; // 原始CSV文件名
+  abortController?: AbortController; // 用于取消API请求
   progress: {
     total: number;
     done: number;

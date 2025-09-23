@@ -338,9 +338,17 @@ export default function HomePage() {
 
   // 停止生成
   const handleStopGeneration = useCallback(() => {
-    stopBatchGeneration(batchState);
+    console.log('🛑 UI: 停止生成按钮被点击');
+    
+    // 更新状态以反映停止操作
+    setBatchState(prev => {
+      const newState = { ...prev };
+      stopBatchGeneration(newState);
+      return newState;
+    });
+    
     addToast('warning', '已停止生成', '正在停止所有任务...');
-  }, [batchState, addToast]);
+  }, [addToast]);
 
   // 重新上传
   const handleReupload = useCallback(() => {
