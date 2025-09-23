@@ -5,6 +5,7 @@ import { UnifiedControlPanel } from '@/components/UnifiedControlPanel';
 import { GenerationControlPanel } from '@/components/GenerationControlPanel';
 import { TaskList } from '@/components/TaskList';
 import { ToastContainer, Toast, ToastType } from '@/components/Toast';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { GenTask, BatchState, CsvParseResult } from '@/lib/types';
 import { runBatchGeneration, stopBatchGeneration } from '@/lib/scheduler';
 import { exportAllTasks } from '@/lib/export';
@@ -25,6 +26,19 @@ export default function HomePage() {
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [referenceImages, setReferenceImages] = useState<File[]>([]);
+  
+  // 确认对话框状态
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
 
   // 添加 Toast
   const addToast = useCallback((type: ToastType, title: string, message?: string, duration?: number) => {
@@ -36,6 +50,11 @@ export default function HomePage() {
   // 移除 Toast
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
+  }, []);
+
+  // 关闭确认对话框
+  const handleCloseConfirmDialog = useCallback(() => {
+    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
   }, []);
 
   // 处理参考图变更
@@ -137,8 +156,8 @@ export default function HomePage() {
     }));
   }, []);
 
-  // 开始生成
-  const handleStartGeneration = useCallback(async () => {
+  // 开始生成 - 显示确认对话框
+  const handleStartGeneration = useCallback(() => {
     if (batchState.isRunning) return;
 
     // 只处理选中的任务
@@ -148,8 +167,59 @@ export default function HomePage() {
       return;
     }
 
+    // 计算统计信息
+    const stats = {
+      total: selectedTasks.length,
+      idle: selectedTasks.filter(t => t.status === 'idle').length,
+      succeeded: selectedTasks.filter(t => t.status === 'succeeded').length,
+      failed: selectedTasks.filter(t => t.status === 'failed').length,
+      stopped: selectedTasks.filter(t => t.status === 'stopped').length
+    };
+
+    // 构建友好的提示信息
+    let message = `🎨 即将开始批量生成 ${stats.total} 个任务\n\n`;
+    
+    // 任务状态详情 - 每个状态单独一行
+    if (stats.succeeded > 0) {
+      message += `🔄 ${stats.succeeded} 个已成功任务（将重新生成）\n`;
+    }
+    if (stats.failed > 0) {
+      message += `🔁 ${stats.failed} 个失败任务（将重新尝试）\n`;
+    }
+    if (stats.stopped > 0) {
+      message += `▶️ ${stats.stopped} 个已停止任务（将重新开始）\n`;
+    }
+    if (stats.idle > 0) {
+      message += `✨ ${stats.idle} 个新任务（首次生成）\n`;
+    }
+    
+    // 添加空行分隔
+    message += `\n`;
+    
+    // 操作提示
+    message += `💡 温馨提示：\n`;
+    message += `• 生成过程中可随时点击"停止生成"按钮中断\n`;
+    message += `• 生成完成后，成功任务会自动取消选中状态\n`;
+    message += `• 建议在网络稳定的环境下进行批量生成`;
+
+    // 显示确认对话框
+    setConfirmDialog({
+      isOpen: true,
+      title: '🚀 开始批量生成',
+      message,
+      onConfirm: () => {
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        executeGeneration();
+      }
+    });
+  }, [batchState, addToast]);
+
+  // 实际执行生成
+  const executeGeneration = useCallback(async () => {
+    const selectedTasks = batchState.tasks.filter(task => task.selected);
+    
     try {
-      addToast('info', '开始批量生成', `正在启动 ${selectedTasks.length} 个选中任务（将重新执行所有选中任务）...`);
+      addToast('info', '开始批量生成', `正在启动 ${selectedTasks.length} 个选中任务...`);
       await runBatchGeneration(batchState, updateTask, referenceImages);
       addToast('success', '批量生成完成', '所有选中任务已处理完成，成功任务已自动取消选中');
     } catch (error) {
@@ -158,7 +228,7 @@ export default function HomePage() {
       // 确保任务完成后重置运行状态
       setBatchState(prev => ({ ...prev, isRunning: false }));
     }
-  }, [batchState, updateTask, addToast]);
+  }, [batchState, updateTask, referenceImages, addToast]);
 
   // 停止生成
   const handleStopGeneration = useCallback(() => {
@@ -307,6 +377,18 @@ export default function HomePage() {
           )}
         </div>
       </main>
+
+      {/* 确认对话框 */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText="🚀 开始生成"
+        cancelText="取消"
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={handleCloseConfirmDialog}
+        type="warning"
+      />
 
       {/* Toast 通知 */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
