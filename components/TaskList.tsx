@@ -8,9 +8,10 @@ interface TaskListProps {
   tasks: GenTask[];
   onUpdateTask: (taskId: number, updates: Partial<GenTask>) => void;
   onToggleSelection: (taskId: number) => void;
+  originalCsvFilename?: string;
 }
 
-export function TaskList({ tasks, onUpdateTask, onToggleSelection }: TaskListProps) {
+export function TaskList({ tasks, onUpdateTask, onToggleSelection, originalCsvFilename }: TaskListProps) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       {tasks.length > 0 ? (
@@ -21,6 +22,7 @@ export function TaskList({ tasks, onUpdateTask, onToggleSelection }: TaskListPro
               task={task}
               onUpdateTask={onUpdateTask}
               onToggleSelection={onToggleSelection}
+              originalCsvFilename={originalCsvFilename}
             />
           ))}
         </div>

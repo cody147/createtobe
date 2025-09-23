@@ -14,6 +14,8 @@ export function parseCsvFile(file: File): Promise<CsvParseResult> {
       try {
         const content = e.target?.result as string;
         const result = parseCsvContent(content);
+        // 添加原始文件名信息
+        result.originalFilename = file.name;
         resolve(result);
       } catch (error) {
         reject(new Error(`CSV 解析失败: ${error instanceof Error ? error.message : '未知错误'}`));

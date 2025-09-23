@@ -26,6 +26,7 @@ export interface BatchState {
   tasks: GenTask[];
   concurrency: number;      // 默认 1；可支持 1~3
   isRunning: boolean;
+  originalCsvFilename?: string; // 原始CSV文件名
   progress: {
     total: number;
     done: number;
@@ -40,6 +41,7 @@ export interface CsvParseResult {
   invalidRows: number;
   totalRows: number;
   errors: string[];
+  originalFilename?: string; // 原始文件名
 }
 
 // 生成接口请求

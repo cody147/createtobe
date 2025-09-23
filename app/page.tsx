@@ -10,7 +10,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { SettingsModal } from '@/components/SettingsModal';
 import { GenTask, BatchState, CsvParseResult, AppSettings } from '@/lib/types';
 import { runBatchGeneration, stopBatchGeneration } from '@/lib/scheduler';
-import { exportAllTasks } from '@/lib/export';
+import { exportAllTasksWithImages } from '@/lib/export';
 
 export default function HomePage() {
   // 状态管理
@@ -165,6 +165,7 @@ export default function HomePage() {
     setBatchState(prev => ({
       ...prev,
       tasks,
+      originalCsvFilename: result.originalFilename, // 保存原始文件名
       progress: {
         total: tasks.length,
         done: 0,
@@ -186,6 +187,7 @@ export default function HomePage() {
       tasks: [],
       concurrency: 10,
       isRunning: false,
+      originalCsvFilename: undefined, // 清空文件名
       progress: {
         total: 0,
         done: 0,
@@ -356,14 +358,15 @@ export default function HomePage() {
 
 
   // 导出结果
-  const handleExportResults = useCallback(() => {
+  const handleExportResults = useCallback(async () => {
     try {
-      exportAllTasks(batchState.tasks);
-      addToast('success', '导出成功', '结果已保存到本地文件');
+      addToast('info', '开始导出', '正在下载CSV文件和所有图片...');
+      await exportAllTasksWithImages(batchState.tasks, batchState.originalCsvFilename);
+      addToast('success', '导出成功', 'CSV文件和所有图片已下载到本地');
     } catch (error) {
       addToast('error', '导出失败', error instanceof Error ? error.message : '未知错误');
     }
-  }, [batchState.tasks, addToast]);
+  }, [batchState.tasks, batchState.originalCsvFilename, addToast]);
 
   // 显示统计信息
   const handleShowStats = useCallback(() => {
@@ -473,6 +476,7 @@ export default function HomePage() {
               tasks={batchState.tasks}
               onUpdateTask={handleUpdateTask}
               onToggleSelection={handleToggleTaskSelection}
+              originalCsvFilename={batchState.originalCsvFilename}
             />
           )}
 

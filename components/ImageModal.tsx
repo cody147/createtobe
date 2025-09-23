@@ -2,13 +2,17 @@
 
 import React, { useEffect } from 'react';
 import { X, Download, ExternalLink } from 'lucide-react';
+import { GenTask } from '@/lib/types';
+import { downloadSingleImage } from '@/lib/export';
 
 interface ImageModalProps {
   imageUrl: string;
   onClose: () => void;
+  task?: GenTask;
+  originalCsvFilename?: string;
 }
 
-export function ImageModal({ imageUrl, onClose }: ImageModalProps) {
+export function ImageModal({ imageUrl, onClose, task, originalCsvFilename }: ImageModalProps) {
   // 处理 ESC 键关闭
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -30,11 +34,20 @@ export function ImageModal({ imageUrl, onClose }: ImageModalProps) {
     }
   };
 
-  const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = imageUrl;
-    link.download = `generated-image-${Date.now()}.png`;
-    link.click();
+  const handleDownload = async () => {
+    if (task) {
+      try {
+        await downloadSingleImage(task, originalCsvFilename);
+      } catch (error) {
+        console.error('下载图片失败:', error);
+      }
+    } else {
+      // 如果没有任务信息，使用原来的下载方式
+      const link = document.createElement('a');
+      link.href = imageUrl;
+      link.download = `generated-image-${Date.now()}.png`;
+      link.click();
+    }
   };
 
   const handleOpenInNewTab = () => {

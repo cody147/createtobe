@@ -12,14 +12,16 @@ import {
 import { GenTask } from '@/lib/types';
 import { ImageModal } from './ImageModal';
 import { EditPromptModal } from './EditPromptModal';
+import { downloadSingleImage } from '@/lib/export';
 
 interface TaskCardProps {
   task: GenTask;
   onUpdateTask: (taskId: number, updates: Partial<GenTask>) => void;
   onToggleSelection: (taskId: number) => void;
+  originalCsvFilename?: string;
 }
 
-export function TaskCard({ task, onUpdateTask, onToggleSelection }: TaskCardProps) {
+export function TaskCard({ task, onUpdateTask, onToggleSelection, originalCsvFilename }: TaskCardProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [clickTimeout, setClickTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -120,12 +122,13 @@ export function TaskCard({ task, onUpdateTask, onToggleSelection }: TaskCardProp
     setIsEditModalOpen(true);
   };
 
-  const handleDownloadImage = () => {
+  const handleDownloadImage = async () => {
     if (task.imageUrl) {
-      const link = document.createElement('a');
-      link.href = task.imageUrl;
-      link.download = `task-${task.id}.png`;
-      link.click();
+      try {
+        await downloadSingleImage(task, originalCsvFilename);
+      } catch (error) {
+        console.error('下载图片失败:', error);
+      }
     }
   };
 
@@ -276,6 +279,8 @@ export function TaskCard({ task, onUpdateTask, onToggleSelection }: TaskCardProp
         <ImageModal
           imageUrl={selectedImage}
           onClose={() => setSelectedImage(null)}
+          task={task}
+          originalCsvFilename={originalCsvFilename}
         />
       )}
 
