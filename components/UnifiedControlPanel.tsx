@@ -7,7 +7,7 @@ import {
   Download, 
   RefreshCw
 } from 'lucide-react';
-import { parseCsvFile, validateCsvFile, generateSampleCsv } from '@/lib/csv';
+import { parseCsvFile, validateCsvFile } from '@/lib/csv';
 import { CsvParseResult, GenTask } from '@/lib/types';
 
 interface UnifiedControlPanelProps {
@@ -94,16 +94,16 @@ export function UnifiedControlPanel({
   }, [handleFileSelect]);
 
   const handleDownloadSample = useCallback(() => {
-    const sampleCsv = generateSampleCsv();
-    const blob = new Blob([sampleCsv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
+    console.log('开始下载示例文件...');
+    // 直接下载静态文件
     const link = document.createElement('a');
-    link.href = url;
+    link.href = '/sample.csv';
     link.download = 'sample.csv';
+    link.style.display = 'none';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    console.log('下载链接已触发');
   }, []);
 
   const hasTasks = tasks.length > 0;
@@ -132,6 +132,7 @@ export function UnifiedControlPanel({
             onChange={handleFileInputChange}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             disabled={isRunning}
+            style={{ zIndex: 1 }}
           />
           
           <div className="flex flex-col items-center space-y-3">
@@ -156,8 +157,13 @@ export function UnifiedControlPanel({
             </div>
             
             <button
-              onClick={handleDownloadSample}
-              className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                handleDownloadSample();
+              }}
+              className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors relative"
+              style={{ zIndex: 10 }}
             >
               <Download className="w-3 h-3 mr-1" />
               下载示例文件
