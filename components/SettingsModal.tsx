@@ -96,7 +96,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
             <div className="space-y-3">
               <div className="flex items-center space-x-2">
                 <Key className="w-4 h-4 text-gray-600" />
-                <h4 className="text-sm font-medium text-gray-900">API密钥</h4>
+                <h4 className="text-sm font-medium text-gray-900">APICore密钥</h4>
               </div>
               <div className="pl-6">
                 <div className="space-y-2">
@@ -118,6 +118,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                   </div>
                   <p className="text-xs text-gray-500">
                     密钥将安全存储在本地，不会上传到服务器
+                    申请地址：<a href="https://ismaque.org" target="_blank" className="text-blue-500 hover:text-blue-600">https://ismaque.org</a>
                   </p>
                 </div>
               </div>

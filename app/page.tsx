@@ -159,7 +159,7 @@ export default function HomePage() {
       ...row,
       status: 'idle' as const,
       attempts: 0,
-      selected: true  // 默认全部选中
+      selected: false  // 默认不选中，用户需要手动选择
     }));
 
     setBatchState(prev => ({
