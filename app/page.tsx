@@ -13,7 +13,7 @@ export default function HomePage() {
   // 状态管理
   const [batchState, setBatchState] = useState<BatchState>({
     tasks: [],
-    concurrency: 1,
+    concurrency: 10,
     isRunning: false,
     progress: {
       total: 0,
@@ -80,7 +80,7 @@ export default function HomePage() {
   const handleClear = useCallback(() => {
     setBatchState({
       tasks: [],
-      concurrency: 1,
+      concurrency: 10,
       isRunning: false,
       progress: {
         total: 0,
@@ -171,7 +171,7 @@ export default function HomePage() {
     // 清空当前任务
     setBatchState({
       tasks: [],
-      concurrency: 1,
+      concurrency: 10,
       isRunning: false,
       progress: { total: 0, done: 0, success: 0, failed: 0 }
     });
