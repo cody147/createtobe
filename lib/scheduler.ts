@@ -2,6 +2,7 @@
  * 任务调度和重试逻辑
  */
 import { GenTask, BatchState, GenerateRequest, GenerateResponse } from './types';
+import { GENERATE_IMAGE_API } from './apipath';
 
 /**
  * 延迟函数
@@ -42,6 +43,7 @@ async function callGenerateApi(prompt: string, referenceImages?: File[], setting
   
   // 添加图片（支持File对象）
   if (referenceImages && referenceImages.length > 0) {
+    let picIndex = 1;
     for (let index = 0; index < referenceImages.length; index++) {
       const img = referenceImages[index];
       
@@ -62,7 +64,7 @@ async function callGenerateApi(prompt: string, referenceImages?: File[], setting
             "type": "image_url",
             "image_url": {"url": base64Url}
           });
-          newPrompt += `\n${fileName}使用图${index + 1}中角色图片`;
+          newPrompt += `\n${fileName}使用图${picIndex++}中角色图片`;
           // 记录路径信息用于日志
           console.log(`添加参考图片: ${fileName}`);
         } else {
@@ -128,7 +130,7 @@ async function callGenerateApi(prompt: string, referenceImages?: File[], setting
   };
 
   // 发送请求 - 按照示例格式
-  const response = await fetch("https://ismaque.org/v1/chat/completions", {
+  const response = await fetch(GENERATE_IMAGE_API, {
     ...requestOptions,
     signal: abortController?.signal
   });
