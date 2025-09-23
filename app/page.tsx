@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Settings } from 'lucide-react';
 import { UnifiedControlPanel } from '@/components/UnifiedControlPanel';
 import { GenerationControlPanel } from '@/components/GenerationControlPanel';
 import { TaskList } from '@/components/TaskList';
 import { ToastContainer, Toast, ToastType } from '@/components/Toast';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { GenTask, BatchState, CsvParseResult } from '@/lib/types';
+import { SettingsModal } from '@/components/SettingsModal';
+import { GenTask, BatchState, CsvParseResult, AppSettings } from '@/lib/types';
 import { runBatchGeneration, stopBatchGeneration } from '@/lib/scheduler';
 import { exportAllTasks } from '@/lib/export';
 
@@ -26,6 +28,56 @@ export default function HomePage() {
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [referenceImages, setReferenceImages] = useState<File[]>([]);
+  
+  // 从本地存储加载设置
+  const loadSettingsFromStorage = (): AppSettings => {
+    if (typeof window === 'undefined') {
+      return {
+        concurrency: 10,
+        style: {
+          name: '系统默认',
+          content: '不设置风格，使用系统默认的生成风格'
+        },
+        aspectRatio: '3:2',
+        apiKey: ''
+      };
+    }
+
+    try {
+      const savedSettings = localStorage.getItem('appSettings');
+      if (savedSettings) {
+        const parsed = JSON.parse(savedSettings);
+        // 验证设置格式，确保所有必需字段都存在
+        if (parsed.concurrency && parsed.style && parsed.aspectRatio !== undefined) {
+          return parsed;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load settings from localStorage:', error);
+    }
+
+    // 返回默认设置
+    return {
+      concurrency: 10,
+      style: {
+        name: '系统默认',
+        content: '不设置风格，使用系统默认的生成风格'
+      },
+      aspectRatio: '3:2',
+      apiKey: ''
+    };
+  };
+
+  // 应用设置状态
+  const [appSettings, setAppSettings] = useState<AppSettings>(loadSettingsFromStorage);
+  
+  // 设置模态框状态
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // 初始化时同步并发设置
+  useEffect(() => {
+    setBatchState(prev => ({ ...prev, concurrency: appSettings.concurrency }));
+  }, [appSettings.concurrency]);
   
   // 确认对话框状态
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -56,6 +108,39 @@ export default function HomePage() {
   const handleCloseConfirmDialog = useCallback(() => {
     setConfirmDialog(prev => ({ ...prev, isOpen: false }));
   }, []);
+
+  // 打开设置模态框
+  const handleOpenSettings = useCallback(() => {
+    setIsSettingsOpen(true);
+  }, []);
+
+  // 关闭设置模态框
+  const handleCloseSettings = useCallback(() => {
+    setIsSettingsOpen(false);
+  }, []);
+
+  // 保存设置到本地存储
+  const saveSettingsToStorage = useCallback((settings: AppSettings) => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('appSettings', JSON.stringify(settings));
+        console.log('Settings saved to localStorage:', settings);
+      } catch (error) {
+        console.error('Failed to save settings to localStorage:', error);
+        addToast('error', '保存失败', '无法保存设置到本地存储');
+      }
+    }
+  }, [addToast]);
+
+  // 处理设置变更
+  const handleSettingsChange = useCallback((newSettings: AppSettings) => {
+    setAppSettings(newSettings);
+    // 保存到本地存储
+    saveSettingsToStorage(newSettings);
+    // 同步更新批量状态中的并发数
+    setBatchState(prev => ({ ...prev, concurrency: newSettings.concurrency }));
+    addToast('success', '设置已保存', '您的设置已成功保存到本地存储');
+  }, [addToast, saveSettingsToStorage]);
 
   // 处理参考图变更
   const handleReferenceImagesChange = useCallback((images: File[]) => {
@@ -179,6 +264,13 @@ export default function HomePage() {
     // 构建友好的提示信息
     let message = `🎨 即将开始批量生成 ${stats.total} 个任务\n\n`;
     
+    // 显示用户设置信息
+    message += `⚙️ 当前设置：\n`;
+    message += `• 并发数量：${appSettings.concurrency}\n`;
+    message += `• 生成风格：${appSettings.style.name}\n`;
+    message += `• 图片比例：${appSettings.aspectRatio}\n`;
+    message += `• API密钥：${appSettings.apiKey ? '已配置' : '未配置'}\n\n`;
+    
     // 任务状态详情 - 每个状态单独一行
     if (stats.succeeded > 0) {
       message += `🔄 ${stats.succeeded} 个已成功任务（将重新生成）\n`;
@@ -212,15 +304,25 @@ export default function HomePage() {
         executeGeneration();
       }
     });
-  }, [batchState, addToast]);
+  }, [batchState, appSettings, addToast]);
 
   // 实际执行生成
   const executeGeneration = useCallback(async () => {
     const selectedTasks = batchState.tasks.filter(task => task.selected);
     
+    // 检查API密钥
+    if (!appSettings.apiKey || appSettings.apiKey.trim() === '') {
+      addToast('error', 'API密钥未配置', '请先在设置中配置API密钥');
+      return;
+    }
+    
     try {
       addToast('info', '开始批量生成', `正在启动 ${selectedTasks.length} 个选中任务...`);
-      await runBatchGeneration(batchState, updateTask, referenceImages);
+      await runBatchGeneration(batchState, updateTask, referenceImages, {
+        apiKey: appSettings.apiKey,
+        style: appSettings.style,
+        aspectRatio: appSettings.aspectRatio
+      });
       addToast('success', '批量生成完成', '所有选中任务已处理完成，成功任务已自动取消选中');
     } catch (error) {
       addToast('error', '生成失败', error instanceof Error ? error.message : '未知错误');
@@ -228,7 +330,7 @@ export default function HomePage() {
       // 确保任务完成后重置运行状态
       setBatchState(prev => ({ ...prev, isRunning: false }));
     }
-  }, [batchState, updateTask, referenceImages, addToast]);
+  }, [batchState, updateTask, referenceImages, appSettings, addToast]);
 
   // 停止生成
   const handleStopGeneration = useCallback(() => {
@@ -278,6 +380,7 @@ export default function HomePage() {
   // 更新并发数
   const handleConcurrencyChange = useCallback((concurrency: number) => {
     setBatchState(prev => ({ ...prev, concurrency }));
+    setAppSettings(prev => ({ ...prev, concurrency }));
   }, []);
 
   // 计算是否有任务
@@ -292,6 +395,14 @@ export default function HomePage() {
             <div>
               <h1 className="text-xl font-semibold text-gray-900">批量文生图工具</h1>
             </div>
+            <button
+              onClick={handleOpenSettings}
+              className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              title="应用设置"
+            >
+              <Settings className="w-4 h-4" />
+              <span className="text-sm font-medium">设置</span>
+            </button>
           </div>
         </div>
       </header>
@@ -377,6 +488,14 @@ export default function HomePage() {
           )}
         </div>
       </main>
+
+      {/* 设置模态框 */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={handleCloseSettings}
+        settings={appSettings}
+        onSettingsChange={handleSettingsChange}
+      />
 
       {/* 确认对话框 */}
       <ConfirmDialog

@@ -46,12 +46,17 @@ export interface CsvParseResult {
 export interface GenerateRequest {
   prompt: string;
   referenceImages?: File[];
+  apiKey: string;
+  style?: StyleOption;
+  aspectRatio?: AspectRatio;
 }
 
 // 生成接口响应
 export interface GenerateResponse {
   taskId: string;
   imageUrl: string;
+  previewUrl?: string;
+  sourceUrl?: string;
 }
 
 // API 错误响应
@@ -84,6 +89,23 @@ export interface ExportRow {
   imageUrl?: string;
   errorMsg?: string;
   attempts: number;
+}
+
+// 风格选项
+export interface StyleOption {
+  name: string;
+  content: string;
+}
+
+// 图片比例选项
+export type AspectRatio = '3:2' | '2:3' | '9:16';
+
+// 应用设置
+export interface AppSettings {
+  concurrency: number;
+  style: StyleOption;
+  aspectRatio: AspectRatio;
+  apiKey: string;
 }
 
 

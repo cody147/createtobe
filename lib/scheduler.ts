@@ -31,7 +31,7 @@ function fileToBase64(file: File): Promise<string> {
 /**
  * 调用生成接口 - 按照 API_REQUEST_EXAMPLE.md 格式
  */
-async function callGenerateApi(prompt: string, referenceImages?: File[]): Promise<GenerateResponse> {
+async function callGenerateApi(prompt: string, referenceImages?: File[], settings?: { apiKey: string; style?: any; aspectRatio?: string }): Promise<GenerateResponse> {
   // 构建消息内容 - 按照Python代码格式
   let content: Array<{type: string, text?: string, image_url?: {url: string}}> = [
     {"type": "text", "text": prompt}
@@ -74,17 +74,33 @@ async function callGenerateApi(prompt: string, referenceImages?: File[]): Promis
     }
   }
 
+  // 添加用户设置的生成风格和图片比例
+  if (settings?.style && settings.style.name !== '系统默认') {
+    newPrompt += `\n\n生成风格: ${settings.style.content}`;
+  }
+  
+  if (settings?.aspectRatio) {
+    const ratioMap: Record<string, string> = {
+      '3:2': '横屏比例 3:2',
+      '2:3': '竖屏比例 2:3', 
+      '9:16': '手机竖屏比例 9:16'
+    };
+    newPrompt += `\n\n图片比例: ${ratioMap[settings.aspectRatio]}`;
+  }
+
   // 更新content中的文本内容
   content[0] = {"type": "text", "text": newPrompt};
 
   console.log(`更改后的prompt: ${newPrompt}`);
 
-  // 获取API密钥
-  const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || 'sk-xxxx';
+  // 检查API密钥
+  if (!settings?.apiKey || settings.apiKey.trim() === '') {
+    throw new Error('请先在设置中配置API密钥');
+  }
   
-  // 构建请求头 - 按照示例格式
+  // 构建请求头 - 使用用户设置的API密钥
   const myHeaders = new Headers();
-  myHeaders.append("Authorization", `Bearer ${apiKey}`);
+  myHeaders.append("Authorization", `Bearer ${settings.apiKey}`);
   myHeaders.append("Content-Type", "application/json");
 
   // 构建请求体 - 按照Python代码格式
@@ -177,7 +193,8 @@ async function runSingleTask(
   task: GenTask, 
   state: BatchState,
   onUpdate: (task: GenTask) => void,
-  referenceImages?: File[]
+  referenceImages?: File[],
+  settings?: { apiKey: string; style?: any; aspectRatio?: string }
 ): Promise<void> {
   console.log(`🎬 开始执行任务 ${task.id}, 当前状态: ${task.status}`);
   
@@ -188,7 +205,7 @@ async function runSingleTask(
 
   try {
     console.log(`🚀 调用生成API, prompt: ${task.prompt.substring(0, 50)}...`);
-    const result = await callGenerateApi(task.prompt, referenceImages);
+    const result = await callGenerateApi(task.prompt, referenceImages, settings);
     
     console.log(`✅ 生成成功, taskId: ${result.taskId}, imageUrl: ${result.imageUrl}`);
     task.taskId = result.taskId;
@@ -255,7 +272,8 @@ async function worker(
   tasks: GenTask[],
   state: BatchState,
   onUpdate: (task: GenTask) => void,
-  referenceImages?: File[]
+  referenceImages?: File[],
+  settings?: { apiKey: string; style?: any; aspectRatio?: string }
 ): Promise<void> {
   console.log(`🔧 工作线程启动, 待处理任务数: ${tasks.length}, 运行状态: ${state.isRunning}`);
   
@@ -271,7 +289,7 @@ async function worker(
     // 处理所有状态为 idle 的任务
     if (task.status === 'idle') {
       console.log(`✅ 工作线程: 任务 ${task.id} 状态为 idle，开始执行`);
-      await runSingleTask(task, state, onUpdate, referenceImages);
+      await runSingleTask(task, state, onUpdate, referenceImages, settings);
     } else {
       console.log(`⏭️ 工作线程: 跳过任务 ${task.id}，状态为 ${task.status}`);
     }
@@ -286,7 +304,8 @@ async function worker(
 export async function runBatchGeneration(
   state: BatchState,
   onUpdate: (task: GenTask) => void,
-  referenceImages?: File[]
+  referenceImages?: File[],
+  settings?: { apiKey: string; style?: any; aspectRatio?: string }
 ): Promise<void> {
   console.log('🚀 runBatchGeneration 开始执行');
   console.log('📊 当前状态:', {
@@ -330,7 +349,7 @@ export async function runBatchGeneration(
   console.log(`🔧 创建 ${state.concurrency} 个工作线程，任务队列长度: ${taskQueue.length}`);
   
   for (let i = 0; i < state.concurrency; i++) {
-    workers.push(worker(taskQueue, state, onUpdate, referenceImages));
+    workers.push(worker(taskQueue, state, onUpdate, referenceImages, settings));
   }
   
   // 等待所有工作线程完成

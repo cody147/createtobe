@@ -207,22 +207,6 @@ export function GenerationControlPanel({
             />
           </div>
 
-          {/* 并发数设置 */}
-          <div className="flex items-center space-x-1">
-            <label className="text-xs text-gray-600">并发:</label>
-            <select
-              value={concurrency}
-              onChange={(e) => onConcurrencyChange(Number(e.target.value))}
-              disabled={isRunning}
-              className="px-1.5 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
-            >
-              <option value={1}>1</option>
-              <option value={5}>5</option>
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={30}>30</option>
-            </select>
-          </div>
 
           {/* 操作按钮组 */}
           <div className="flex items-center flex-wrap gap-2">

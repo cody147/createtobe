@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GenerateRequest, GenerateResponse, ErrorResponse, ExternalApiResponse, ApiErrorResponse } from '@/lib/types';
+import { GenerateRequest, GenerateResponse, ErrorResponse, ExternalApiResponse, ApiErrorResponse, AppSettings } from '@/lib/types';
 
 // API 配置
 const API_URL = 'https://asyncdata.net/tran/https://api.apicore.ai/v1/chat/completions';
-const API_KEY = process.env.OPENAI_API_KEY || 'sk-xxxx'; // 从环境变量获取API密钥
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,16 +15,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 检查API密钥
-    if (!API_KEY || API_KEY === 'sk-xxxx') {
+    // 检查用户设置的API密钥
+    if (!body.apiKey || body.apiKey.trim() === '') {
       return NextResponse.json(
-        { error: 'API key not configured' } as ErrorResponse,
-        { status: 500 }
+        { error: '请先在设置中配置API密钥' } as ErrorResponse,
+        { status: 400 }
       );
     }
 
     // 构建请求内容
     let content = body.prompt;
+    
+    // 添加生成风格到提示词
+    if (body.style && body.style.name !== '系统默认') {
+      content += `\n\n生成风格: ${body.style.content}`;
+    }
+    
+    // 添加图片比例到提示词
+    if (body.aspectRatio) {
+      const ratioMap = {
+        '3:2': '横屏比例 3:2',
+        '2:3': '竖屏比例 2:3', 
+        '9:16': '手机竖屏比例 9:16'
+      };
+      content += `\n\n图片比例: ${ratioMap[body.aspectRatio]}`;
+    }
     
     // 如果有参考图，添加参考图信息到prompt中
     if (body.referenceImages && body.referenceImages.length > 0) {
@@ -47,9 +61,9 @@ export async function POST(request: NextRequest) {
       ]
     };
 
-    // 构建请求头 - 按照你的示例格式
+    // 构建请求头 - 使用用户提供的API密钥
     const myHeaders = new Headers();
-    myHeaders.append("Authorization", `Bearer ${API_KEY}`);
+    myHeaders.append("Authorization", `Bearer ${body.apiKey}`);
     myHeaders.append("Content-Type", "application/json");
 
     // 构建请求选项 - 按照你的示例格式
