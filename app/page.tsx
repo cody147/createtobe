@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, HelpCircle } from 'lucide-react';
 import { UnifiedControlPanel } from '@/components/UnifiedControlPanel';
 import { GenerationControlPanel } from '@/components/GenerationControlPanel';
 import { TaskList } from '@/components/TaskList';
 import { ToastContainer, Toast, ToastType } from '@/components/Toast';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { SettingsModal } from '@/components/SettingsModal';
+import { HelpModal } from '@/components/HelpModal';
 import { GenTask, BatchState, CsvParseResult, AppSettings } from '@/lib/types';
 import { runBatchGeneration, stopBatchGeneration } from '@/lib/scheduler';
 import { exportAllTasksWithImages } from '@/lib/export';
@@ -73,6 +74,9 @@ export default function HomePage() {
   
   // 设置模态框状态
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  
+  // 使用说明模态框状态
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   // 初始化时同步并发设置
   useEffect(() => {
@@ -117,6 +121,16 @@ export default function HomePage() {
   // 关闭设置模态框
   const handleCloseSettings = useCallback(() => {
     setIsSettingsOpen(false);
+  }, []);
+
+  // 打开使用说明模态框
+  const handleOpenHelp = useCallback(() => {
+    setIsHelpOpen(true);
+  }, []);
+
+  // 关闭使用说明模态框
+  const handleCloseHelp = useCallback(() => {
+    setIsHelpOpen(false);
   }, []);
 
   // 保存设置到本地存储
@@ -408,14 +422,24 @@ export default function HomePage() {
             <div>
               <h1 className="text-xl font-semibold text-gray-900">批量文生图工具</h1>
             </div>
-            <button
-              onClick={handleOpenSettings}
-              className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              title="应用设置"
-            >
-              <Settings className="w-4 h-4" />
-              <span className="text-sm font-medium">设置</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleOpenHelp}
+                className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                title="使用说明"
+              >
+                <HelpCircle className="w-4 h-4" />
+                <span className="text-sm font-medium">使用说明</span>
+              </button>
+              <button
+                onClick={handleOpenSettings}
+                className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                title="应用设置"
+              >
+                <Settings className="w-4 h-4" />
+                <span className="text-sm font-medium">设置</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -509,6 +533,12 @@ export default function HomePage() {
         onClose={handleCloseSettings}
         settings={appSettings}
         onSettingsChange={handleSettingsChange}
+      />
+
+      {/* 使用说明模态框 */}
+      <HelpModal
+        isOpen={isHelpOpen}
+        onClose={handleCloseHelp}
       />
 
       {/* 确认对话框 */}
