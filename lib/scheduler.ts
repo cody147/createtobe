@@ -4,6 +4,8 @@
 import { GenTask, BatchState, GenerateRequest, GenerateResponse } from './types';
 import { GENERATE_IMAGE_API } from './apipath';
 
+const MAX_ATTEMPTS = 1; // 初始尝试为1
+
 /**
  * 延迟函数
  */
@@ -16,15 +18,31 @@ function delay(ms: number): Promise<void> {
  */
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
+    console.log(`🔄 开始读取文件: ${file.name}, 大小: ${file.size} bytes`);
+    
+    // 检查文件是否已经被读取过
+    if (file.size === 0) {
+      console.warn(`⚠️ 文件 ${file.name} 大小为0，可能已被读取过`);
+      reject(new Error('File has been consumed or is empty'));
+      return;
+    }
+    
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === 'string') {
+        console.log(`✅ 文件 ${file.name} 读取成功，base64长度: ${reader.result.length}`);
         resolve(reader.result);
       } else {
+        console.error(`❌ 文件 ${file.name} 读取结果不是字符串`);
         reject(new Error('Failed to convert file to base64'));
       }
     };
-    reader.onerror = () => reject(new Error('FileReader error'));
+    reader.onerror = (error) => {
+      console.error(`❌ 文件 ${file.name} 读取失败:`, error);
+      reject(new Error('FileReader error'));
+    };
+    
+    console.log(`📖 开始读取文件内容...`);
     reader.readAsDataURL(file);
   });
 }
@@ -33,6 +51,17 @@ function fileToBase64(file: File): Promise<string> {
  * 调用生成接口 - 按照 API_REQUEST_EXAMPLE.md 格式
  */
 async function callGenerateApi(prompt: string, referenceImages?: File[], settings?: { apiKey: string; style?: any; aspectRatio?: string }, abortController?: AbortController): Promise<GenerateResponse> {
+  // 调试信息：检查参考图传递情况
+  console.log('🔍 callGenerateApi 接收到的参数:');
+  console.log('- prompt:', prompt.substring(0, 100) + '...');
+  console.log('- referenceImages:', referenceImages);
+  console.log('- referenceImages length:', referenceImages?.length || 0);
+  if (referenceImages && referenceImages.length > 0) {
+    referenceImages.forEach((img, index) => {
+      console.log(`- 参考图 ${index + 1}: ${img.name} (${img.size} bytes)`);
+    });
+  }
+  
   // 构建消息内容 - 按照Python代码格式
   let content: Array<{type: string, text?: string, image_url?: {url: string}}> = [
     {"type": "text", "text": prompt}
@@ -43,13 +72,17 @@ async function callGenerateApi(prompt: string, referenceImages?: File[], setting
   
   // 添加图片（支持File对象）
   if (referenceImages && referenceImages.length > 0) {
+    console.log(`🖼️ 开始处理 ${referenceImages.length} 张参考图`);
     let picIndex = 1;
     for (let index = 0; index < referenceImages.length; index++) {
       const img = referenceImages[index];
+      console.log(`🖼️ 处理参考图 ${index + 1}/${referenceImages.length}: ${img.name}`);
       
       // 检查prompt中是否包含文件名
       const fileName = img.name.replace(/\.[^/.]+$/, ''); // 去掉文件扩展名
       const isFileNameInPrompt = prompt.toLowerCase().includes(fileName.toLowerCase());
+      
+      console.log(`🔍 检查匹配: 文件名=${fileName}, 在prompt中=${isFileNameInPrompt}`);
       
       if (!isFileNameInPrompt) {
         console.log(`跳过图片 ${img.name}：prompt中不包含文件名 ${fileName}`);
@@ -57,6 +90,7 @@ async function callGenerateApi(prompt: string, referenceImages?: File[], setting
       }
       
       try {
+        console.log(`🔄 开始转换图片 ${img.name} 为base64...`);
         // 将File对象转换为base64
         const base64Url = await fileToBase64(img);
         if (base64Url) {
@@ -66,14 +100,17 @@ async function callGenerateApi(prompt: string, referenceImages?: File[], setting
           });
           newPrompt += `\n${fileName}使用图${picIndex++}中角色图片`;
           // 记录路径信息用于日志
-          console.log(`添加参考图片: ${fileName}`);
+          console.log(`✅ 成功添加参考图片: ${fileName}`);
         } else {
-          console.warn(`参考图片转换base64失败: ${img.name}`);
+          console.warn(`❌ 参考图片转换base64失败: ${img.name}`);
         }
       } catch (error) {
-        console.warn(`处理参考图片失败: ${img.name}`, error);
+        console.warn(`❌ 处理参考图片失败: ${img.name}`, error);
       }
     }
+    console.log(`🖼️ 参考图处理完成，共处理 ${picIndex - 1} 张图片`);
+  } else {
+    console.log(`🖼️ 没有参考图需要处理`);
   }
 
   // 添加用户设置的生成风格和图片比例
@@ -218,6 +255,8 @@ async function runSingleTask(
 
   try {
     console.log(`🚀 调用生成API, prompt: ${task.prompt.substring(0, 50)}...`);
+    console.log(`📸 传递给 callGenerateApi 的参考图:`, referenceImages);
+    console.log(`📸 参考图数量:`, referenceImages?.length || 0);
     const result = await callGenerateApi(task.prompt, referenceImages, settings, state.abortController);
     
     // 检查是否在API调用期间被停止
@@ -258,7 +297,7 @@ async function runSingleTask(
     console.error(`❌ 任务 ${task.id} 执行失败:`, errorMessage);
     
     // 判断是否需要重试
-    if (task.attempts < 3 && shouldRetry(errorMessage)) {
+    if (task.attempts < MAX_ATTEMPTS && shouldRetry(errorMessage)) {
       console.log(`🔄 准备重试任务 ${task.id}, 当前尝试次数: ${task.attempts}`);
       // 指数退避重试
       const delayMs = Math.pow(2, task.attempts - 1) * 1000;
@@ -324,6 +363,13 @@ async function worker(
   settings?: { apiKey: string; style?: any; aspectRatio?: string }
 ): Promise<void> {
   console.log(`🔧 工作线程启动, 待处理任务数: ${tasks.length}, 运行状态: ${state.isRunning}`);
+  console.log(`📸 工作线程接收到的参考图:`, referenceImages);
+  console.log(`📸 工作线程参考图数量:`, referenceImages?.length || 0);
+  if (referenceImages && referenceImages.length > 0) {
+    referenceImages.forEach((img, index) => {
+      console.log(`- 工作线程参考图 ${index + 1}: ${img.name} (${img.size} bytes)`);
+    });
+  }
   
   while (state.isRunning && tasks.length > 0) {
     const task = tasks.shift();
@@ -361,6 +407,13 @@ export async function runBatchGeneration(
     concurrency: state.concurrency,
     totalTasks: state.tasks.length
   });
+  console.log('📸 接收到的参考图:', referenceImages);
+  console.log('📸 参考图数量:', referenceImages?.length || 0);
+  if (referenceImages && referenceImages.length > 0) {
+    referenceImages.forEach((img, index) => {
+      console.log(`- 参考图 ${index + 1}: ${img.name} (${img.size} bytes)`);
+    });
+  }
   
   state.isRunning = true;
   
@@ -395,13 +448,26 @@ export async function runBatchGeneration(
     onUpdate({ ...task });
   });
   
-  // 创建并发工作线程
+  // 创建并发工作线程 - 修复参考图传递问题
   const workers: Promise<void>[] = [];
-  const taskQueue = [...pendingTasks];
-  console.log(`🔧 创建 ${state.concurrency} 个工作线程，任务队列长度: ${taskQueue.length}`);
-  
-  for (let i = 0; i < state.concurrency; i++) {
-    workers.push(worker(taskQueue, state, onUpdate, referenceImages, settings));
+  const workerCount = Math.min(state.concurrency, pendingTasks.length);
+  console.log(`🔧 创建 ${workerCount} 个工作线程，任务队列长度: ${pendingTasks.length}`);
+
+  // 为每个工作线程创建独立的任务队列
+  for (let i = 0; i < workerCount; i++) {
+    // 为每个工作线程分配任务
+    const workerTasks = pendingTasks.filter((_, index) => index % workerCount === i);
+    console.log(`🔧 工作线程 ${i + 1} 分配了 ${workerTasks.length} 个任务`);
+    
+    // 创建独立的任务队列副本，避免多线程竞态条件
+    const taskQueue = [...workerTasks];
+    
+    // 为每个工作线程传递参考图的深拷贝，避免共享状态问题
+    // 注意：File 对象在 JavaScript 中只能被读取一次，所以需要特殊处理
+    const workerReferenceImages = referenceImages ? [...referenceImages] : undefined;
+    console.log(`🔧 工作线程 ${i + 1} 分配的参考图:`, workerReferenceImages?.length || 0);
+    
+    workers.push(worker(taskQueue, state, onUpdate, workerReferenceImages, settings));
   }
   
   // 等待所有工作线程完成
@@ -469,8 +535,5 @@ export async function retryFailedTasks(
   // 运行重试
   await runBatchGeneration(state, onUpdate);
 }
-
-
-
 
 
